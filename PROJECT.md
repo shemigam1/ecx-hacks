@@ -7,7 +7,7 @@
 >
 > Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split).
 
-**Last updated:** 2026-07-13 · **Phase:** Week 0 (pre-build, contract definition) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
+**Last updated:** 2026-07-13 · **Phase:** Week 0 in progress (contracts committed) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
 
 ---
 
@@ -34,9 +34,11 @@ These were open questions in the PRD. They are now settled. Do not relitigate wi
 | D2 | Owner web login | **Yes** — owner gets web access too | Owner auth = phone + OTP (or email/pass). Adds UI surface for F. Web is **not** trusted-contact-only. ⚠️ see Risk R6. |
 | D3 | Human delegate flow | **Keep it** | Human delegate can log in (web/WhatsApp) and pay allowlisted billers within cap. Same policy path as AI agent — low backend cost, but adds a web flow + a demo scene for F. ⚠️ see Risk R6. |
 | D4 | Cosign on a live phone call | **Async callback** | Agent says "I'll ask your daughter and call/text you back," ends the leg. Intent stays **held**; resolves after cosign. Requires held-intent state machine (see §5). |
+| D5 | ORM / migrations | **Prisma** | Fast typed migrations + trivial jsonb. Sits beside Nest DI (not decorator-based). Dev A owns `prisma/schema.prisma`. |
+| D6 | WS transport | **socket.io** (`@nestjs/platform-socket.io`) | Built-in reconnect/rooms for cosign + demo console; matches frontend socket.io client. |
+| D7 | Idempotency key | **`{channel}:{sessionId}:{turnId}`**, minted by the channel adapter per user utterance | One utterance ⇒ at most one payment; safe retries. |
 
-**Still open** (decide by end of Week 1): TTS provider for Nigerian voices (Spitch / YarnGPT spike);
-socket.io vs native WS for the Nest gateway (leaning **socket.io** for reconnect handling).
+**Still open** (decide by end of Week 1): TTS provider for Nigerian voices (Spitch / YarnGPT spike).
 
 ---
 
@@ -136,10 +138,12 @@ callback/SMS. On **web/text**, the requester can wait in-session. Idempotency ke
 Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 
 ### Week 0 — contracts (do before anything else)
-- ☐ Shared types committed (`PaymentIntent`, `PolicyDecision`, `PolicyReasonCode`) — **A + B pair**
+- ☑ Shared types + 4 seam interfaces + **runnable fakes** committed in [`ecx-backend/src/contracts/`](ecx-backend/src/contracts) — smoke test 8/8 green — **A + B pair**
+- ☑ `PolicyRule.params` jsonb schema per `rule_type` documented — encoded as the `PolicyRule` union in [`contracts/policy.ts`](ecx-backend/src/contracts/policy.ts) — **A**
+- ☑ Idempotency-key scheme decided — D7 `{channel}:{sessionId}:{turnId}` — **A + B**
+- ☑ Prisma init + full schema + first migration (`20260713165553_init`) + docker-compose Postgres (host port **5544**) — **A**
 - ☐ REST + WS API sketch agreed (endpoints, payloads) — **A + B + F**
-- ☐ `PolicyRule.params` jsonb schema per `rule_type` documented — **A**
-- ☐ Idempotency-key scheme decided (who generates, per what) — **A + B**
+- ☐ Nest module skeletons (Agent/Channels/Cosign/Auth) + `EventEmitter2` + socket.io gateway — **B**
 - ☐ Repo layout: confirm monorepo vs separate frontend; add `frontend/` — **F**
 
 ### Week 1 — the spine (exit: a curl-able intent returns ALLOW/ESCALATE/DENY + reasons)
@@ -196,6 +200,12 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 
 - **2026-07-13** — D1–D4 locked (see §2). Owner web login and human-delegate flow kept despite added
   frontend load; flagged as R6 cut-candidates if Week 2 slips.
+- **2026-07-13** — Week 0 started. `ecx-backend/src/contracts/` committed (shared types + 4 seam
+  interfaces + runnable fakes; 8/8 smoke tests green). D5 (Prisma), D6 (socket.io), D7 (idempotency
+  scheme) locked.
+- **2026-07-13** — Prisma **pinned to 6.x** (do not bump to 7 without work: Prisma 7 drops in-schema
+  `url` for an adapter-based `prisma.config.ts`). Full schema + `init` migration applied. Dev
+  Postgres runs on host port **5544** (5432 is taken by another project on this machine).
 
 ---
 

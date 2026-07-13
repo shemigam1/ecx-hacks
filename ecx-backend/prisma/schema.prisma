@@ -1,0 +1,234 @@
+// Steward data model — see PRD.md §7 and PROJECT.md §4.
+// Money is ALWAYS integer minor units (kobo): Prisma `Int`. Never Float/Decimal-as-naira.
+// Owned by Dev A (D5). Schema changes go through Dev A via PR.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  TRUSTED_CONTACT
+  DELEGATE
+}
+
+enum DelegateType {
+  HUMAN
+  AI_AGENT
+}
+
+enum CredentialStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum RuleType {
+  SPEND_CAP_MONTHLY
+  SPEND_CAP_PER_TX
+  BILLER_ALLOWLIST
+  RECIPIENT_LOCK
+  COSIGN_THRESHOLD
+  CHANNEL_SCOPE
+  TIME_WINDOW
+}
+
+enum Channel {
+  VOICE
+  WHATSAPP
+  WEB
+}
+
+enum IntentStatus {
+  PENDING
+  ALLOWED
+  ESCALATED
+  DENIED
+  EXECUTED
+  FAILED
+  VOIDED
+}
+
+enum Verdict {
+  ALLOW
+  ESCALATE
+  DENY
+}
+
+enum CosignStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  phoneMsisdn  String?  @unique
+  name         String
+  languagePref String   @default("en")
+  pinHash      String? // argon2; collected via DTMF (D1), never stored as audio
+  role         Role
+  createdAt    DateTime @default(now())
+
+  ownedAccounts      Account[]        @relation("AccountOwner")
+  delegateCreds      Credential[]     @relation("DelegateUser")
+  cosignRequests     CosignRequest[]
+  conversationStates ConversationSession[]
+}
+
+model Account {
+  id          String   @id @default(uuid())
+  ownerUserId String
+  owner       User     @relation("AccountOwner", fields: [ownerUserId], references: [id])
+  balance     Int      @default(0) // mock, kobo
+  createdAt   DateTime @default(now())
+
+  credentials  Credential[]
+  auditEvents  AuditEvent[]
+  anomalyFlags AnomalyFlag[]
+  habits       Habit[]
+}
+
+model Credential {
+  id             String           @id @default(uuid())
+  accountId      String
+  account        Account          @relation(fields: [accountId], references: [id])
+  delegateType   DelegateType
+  delegateUserId String?
+  delegateUser   User?            @relation("DelegateUser", fields: [delegateUserId], references: [id])
+  label          String
+  status         CredentialStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+  revokedAt      DateTime?
+
+  policyRules    PolicyRule[]
+  paymentIntents PaymentIntent[]
+
+  @@index([accountId])
+}
+
+model PolicyRule {
+  id           String     @id @default(uuid())
+  credentialId String
+  credential   Credential @relation(fields: [credentialId], references: [id])
+  ruleType     RuleType
+  // params jsonb — shape per ruleType is the `PolicyRule` union in contracts/policy.ts (W0-A4).
+  params       Json
+
+  @@index([credentialId])
+}
+
+model Biller {
+  id          String  @id @default(uuid())
+  name        String
+  category    String
+  providerRef String
+  aliases     String[] // e.g. ["NEPA", "light"] -> Ikeja Electric
+
+  paymentIntents PaymentIntent[]
+}
+
+model PaymentIntent {
+  id             String       @id @default(uuid())
+  credentialId   String
+  credential     Credential   @relation(fields: [credentialId], references: [id])
+  channel        Channel
+  billerId       String?
+  biller         Biller?      @relation(fields: [billerId], references: [id])
+  recipient      String?
+  amount         Int // kobo
+  meta           Json         @default("{}")
+  status         IntentStatus @default(PENDING)
+  idempotencyKey String       @unique // D7
+  createdAt      DateTime     @default(now())
+
+  decision      PolicyDecision?
+  transaction   Transaction?
+  cosignRequest CosignRequest?
+
+  @@index([credentialId])
+  @@index([status])
+}
+
+model PolicyDecision {
+  id          String        @id @default(uuid())
+  intentId    String        @unique
+  intent      PaymentIntent @relation(fields: [intentId], references: [id])
+  verdict     Verdict
+  reasons     Json // PolicyReason[]
+  evaluatedAt DateTime      @default(now())
+}
+
+model Transaction {
+  id             String        @id @default(uuid())
+  intentId       String        @unique
+  intent         PaymentIntent @relation(fields: [intentId], references: [id])
+  providerRef    String?
+  tokenEncrypted String? // AES-GCM; exposed only via readLastToken re-auth flow
+  executedAt     DateTime      @default(now())
+}
+
+model CosignRequest {
+  id               String       @id @default(uuid())
+  intentId         String       @unique
+  intent           PaymentIntent @relation(fields: [intentId], references: [id])
+  trustedContactId String
+  trustedContact   User         @relation(fields: [trustedContactId], references: [id])
+  status           CosignStatus @default(PENDING)
+  createdAt        DateTime     @default(now())
+  resolvedAt       DateTime?
+}
+
+model AuditEvent {
+  id        String   @id @default(uuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+  actor     String // userId | "AI_AGENT" | "SYSTEM"
+  eventType String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt])
+}
+
+// Learned baselines — aggregates only, never raw transcripts.
+model Habit {
+  id                 String    @id @default(uuid())
+  accountId          String
+  account            Account   @relation(fields: [accountId], references: [id])
+  billerId           String
+  typicalAmountMean  Int // kobo
+  amountVar          Float     @default(0)
+  typicalIntervalDays Float?
+  lastPaidAt         DateTime?
+
+  @@unique([accountId, billerId])
+}
+
+model AnomalyFlag {
+  id        String   @id @default(uuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+  intentId  String?
+  score     Float
+  factors   Json
+  createdAt DateTime @default(now())
+
+  @@index([accountId])
+}
+
+model ConversationSession {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  channel   Channel
+  state     Json     @default("{}")
+  expiresAt DateTime
+
+  @@index([userId])
+}
