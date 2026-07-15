@@ -147,9 +147,9 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - ☐ Repo layout: confirm monorepo vs separate frontend; add `frontend/` — **F**
 
 ### Week 1 — the spine (exit: a curl-able intent returns ALLOW/ESCALATE/DENY + reasons)
-- ☐ Postgres schema + migrations (all core tables, money as integer kobo) — **A**
+- ☑ Postgres schema + migrations (all core tables, money as integer kobo) — **A**
 - ☑ `PolicyModule` + **full unit test suite** for every rule type & boundary — **A**
-- ☐ `PaymentsModule` mock provider (20-digit token, seeded billers, latency, idempotency) — **A**
+- ☑ `PaymentsModule` mock provider (20-digit token, seeded billers, latency, idempotency) — **A**
 - ☐ `AuditModule` append-only log (no delete path) — **A**
 - ☐ REST skeleton exposing intent → decision — **A**
 - ☐ `AuthModule` scaffolding (owner OTP, delegate scoped tokens, DTMF PIN verify stub) — **B**
