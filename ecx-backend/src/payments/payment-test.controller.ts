@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Inject } from '@nestjs/common';
+import { Controller, Post, Body, Inject, Get, Param } from '@nestjs/common';
 import type { PaymentOrchestrator, InitiatePaymentInput } from '../contracts';
 
 @Controller('payments')
@@ -11,5 +11,10 @@ export class PaymentTestController {
   @Post('initiate')
   async initiate(@Body() input: InitiatePaymentInput) {
     return this.paymentOrchestrator.initiatePayment(input);
+  }
+
+  @Get(':id')
+  async getStatus(@Param('id') id: string) {
+    return this.paymentOrchestrator.requeryIntent(id);
   }
 }

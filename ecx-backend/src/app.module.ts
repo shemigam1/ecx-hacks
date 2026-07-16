@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { PaymentsModule } from './payments/payments.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditModule } from './audit/audit.module';
+import { AnomalyModule } from './anomaly/anomaly.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AuditModule } from './audit/audit.module';
     PolicyModule,
     PaymentsModule,
     AuditModule,
+    AnomalyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -64,6 +64,7 @@ describe('PaymentOrchestratorService', () => {
 
   const mockPaymentProvider = {
     execute: jest.fn(),
+    requeryStatus: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -150,6 +151,7 @@ describe('PaymentOrchestratorService', () => {
         status: 'EXECUTED',
       });
       mockPaymentProvider.execute.mockResolvedValue({
+        status: 'SUCCESS',
         providerRef: 'ref_abc',
         token: 'token_123',
       });
@@ -172,7 +174,7 @@ describe('PaymentOrchestratorService', () => {
         data: {
           intentId: 'intent_123',
           providerRef: 'ref_abc',
-          tokenEncrypted: 'token_123',
+          tokenEncrypted: expect.stringMatching(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/),
         },
       });
       expect(auditService.log).toHaveBeenCalledWith(
@@ -375,6 +377,7 @@ describe('PaymentOrchestratorService', () => {
         evaluatedAt: new Date().toISOString(),
       });
       mockPaymentProvider.execute.mockResolvedValue({
+        status: 'SUCCESS',
         providerRef: 'ref_resume',
       });
       mockPrisma.paymentIntent.update.mockResolvedValue({
@@ -461,6 +464,126 @@ describe('PaymentOrchestratorService', () => {
       expect(voidSpy).toHaveBeenCalledWith(
         'intent_123',
         'Cosign request was denied by user user_daughter',
+      );
+    });
+  });
+
+  describe('pending executions and requeryIntent', () => {
+    it('processes ALLOW decision but remains ALLOWED on PENDING status, logs pending_resolution', async () => {
+      mockPrisma.paymentIntent.findUnique.mockResolvedValue(null);
+      mockPrisma.credential.findUnique.mockResolvedValue(mockCredential);
+      mockPolicyEngine.evaluate.mockReturnValue({
+        verdict: 'ALLOW',
+        reasons: [],
+        evaluatedAt: new Date().toISOString(),
+      });
+
+      const dbIntent = {
+        id: 'intent_pending_123',
+        credentialId: 'cred_1',
+        channel: 'WEB',
+        amount: 5099,
+        idempotencyKey: 'key_pending',
+        status: 'ALLOWED',
+        meta: {},
+      };
+      mockPrisma.paymentIntent.create.mockResolvedValue(dbIntent);
+      mockPaymentProvider.execute.mockResolvedValue({
+        status: 'PENDING',
+        providerRef: 'ref_pending',
+      });
+
+      const res = await service.initiatePayment({
+        credentialId: 'cred_1',
+        channel: 'WEB',
+        amount: 5099,
+        idempotencyKey: 'key_pending',
+      });
+
+      expect(res.intent.status).toBe('ALLOWED');
+      expect(mockPrisma.transaction.create).not.toHaveBeenCalled();
+      expect(auditService.log).toHaveBeenCalledWith(
+        'acct_1',
+        'AI_AGENT',
+        'payment.pending_resolution',
+        expect.any(Object),
+      );
+    });
+
+    it('requeryIntent transitions ALLOWED to EXECUTED and saves transaction if provider returns SUCCESS', async () => {
+      const pendingIntent = {
+        id: 'intent_pending_123',
+        credentialId: 'cred_1',
+        channel: 'WEB',
+        amount: 5099,
+        idempotencyKey: 'key_pending',
+        status: 'ALLOWED',
+        meta: {},
+        credential: { accountId: 'acct_1' },
+        transaction: null,
+      };
+
+      mockPrisma.paymentIntent.findUnique.mockResolvedValue(pendingIntent);
+      mockPrisma.paymentIntent.update.mockResolvedValue({
+        ...pendingIntent,
+        status: 'EXECUTED',
+      });
+      mockPaymentProvider.requeryStatus.mockResolvedValue({
+        status: 'SUCCESS',
+        providerRef: 'ref_resolved',
+        token: 'token_1234',
+      });
+
+      const res = await service.requeryIntent('intent_pending_123');
+
+      expect(res.intent.status).toBe('EXECUTED');
+      expect(mockPrisma.transaction.create).toHaveBeenCalledWith({
+        data: {
+          intentId: 'intent_pending_123',
+          providerRef: 'ref_resolved',
+          tokenEncrypted: expect.stringMatching(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/),
+        },
+      });
+      expect(auditService.log).toHaveBeenCalledWith(
+        'acct_1',
+        'SYSTEM',
+        'payment.executed',
+        expect.any(Object),
+      );
+    });
+
+    it('requeryIntent transitions ALLOWED to FAILED if provider returns FAILED', async () => {
+      const pendingIntent = {
+        id: 'intent_pending_123',
+        credentialId: 'cred_1',
+        channel: 'WEB',
+        amount: 5099,
+        idempotencyKey: 'key_pending',
+        status: 'ALLOWED',
+        meta: {},
+        credential: { accountId: 'acct_1' },
+        transaction: null,
+      };
+
+      mockPrisma.paymentIntent.findUnique.mockResolvedValue(pendingIntent);
+      mockPrisma.paymentIntent.update.mockResolvedValue({
+        ...pendingIntent,
+        status: 'FAILED',
+      });
+      mockPaymentProvider.requeryStatus.mockResolvedValue({
+        status: 'FAILED',
+        providerRef: 'ref_resolved',
+        error: 'Declined by upstream',
+      });
+
+      const res = await service.requeryIntent('intent_pending_123');
+
+      expect(res.intent.status).toBe('FAILED');
+      expect(auditService.log).toHaveBeenCalledWith(
+        'acct_1',
+        'SYSTEM',
+        'payment.failed',
+        expect.any(Object),
       );
     });
   });

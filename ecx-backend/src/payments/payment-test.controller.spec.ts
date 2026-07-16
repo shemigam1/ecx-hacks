@@ -7,6 +7,7 @@ describe('PaymentTestController', () => {
 
   const mockOrchestrator = {
     initiatePayment: jest.fn(),
+    requeryIntent: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -42,6 +43,19 @@ describe('PaymentTestController', () => {
     const result = await controller.initiate(input);
 
     expect(orchestrator.initiatePayment).toHaveBeenCalledWith(input);
+    expect(result).toEqual(mockResult);
+  });
+
+  it('should call paymentOrchestrator.requeryIntent with id and return result', async () => {
+    const mockResult = {
+      intent: { id: 'intent_123', status: 'EXECUTED' },
+    };
+
+    mockOrchestrator.requeryIntent.mockResolvedValue(mockResult);
+
+    const result = await controller.getStatus('intent_123');
+
+    expect(orchestrator.requeryIntent).toHaveBeenCalledWith('intent_123');
     expect(result).toEqual(mockResult);
   });
 });

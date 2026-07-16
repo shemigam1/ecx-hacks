@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import * as contracts from '../contracts';
 import type { PaymentProvider } from './payment-provider.interface';
+import { encryptToken } from './token-crypto.helper';
 import type {
   PaymentIntent,
   PolicyDecision,
@@ -168,47 +169,68 @@ export class PaymentOrchestratorService implements contracts.PaymentOrchestrator
           input.recipient,
         );
 
-        // Update to EXECUTED and store transaction
-        const executedIntent = await this.prisma.$transaction(async (tx) => {
-          const updated = await tx.paymentIntent.update({
-            where: { id: savedIntent.id },
-            data: { status: 'EXECUTED' },
+        if (result.status === 'SUCCESS') {
+          // Update to EXECUTED and store transaction
+          const executedIntent = await this.prisma.$transaction(async (tx) => {
+            const updated = await tx.paymentIntent.update({
+              where: { id: savedIntent.id },
+              data: { status: 'EXECUTED' },
+            });
+
+            await tx.transaction.create({
+              data: {
+                intentId: savedIntent.id,
+                providerRef: result.providerRef,
+                tokenEncrypted: result.token ? encryptToken(result.token) : null,
+              },
+            });
+
+            return updated;
           });
 
-          await tx.transaction.create({
-            data: {
+          await this.auditService.log(
+            dbCred.accountId,
+            'AI_AGENT',
+            'payment.executed',
+            {
               intentId: savedIntent.id,
+              amount: input.amount,
               providerRef: result.providerRef,
-              tokenEncrypted: result.token || null,
             },
-          });
+          );
 
-          return updated;
-        });
-
-        await this.auditService.log(
-          dbCred.accountId,
-          'AI_AGENT',
-          'payment.executed',
-          {
+          this.eventEmitter.emit(contracts.IntentEvents.Executed, {
             intentId: savedIntent.id,
+            accountId: dbCred.accountId,
             amount: input.amount,
-            providerRef: result.providerRef,
-          },
-        );
+            billerId: input.billerId,
+            executedAt: new Date().toISOString(),
+          } as contracts.IntentExecutedPayload);
 
-        this.eventEmitter.emit(contracts.IntentEvents.Executed, {
-          intentId: savedIntent.id,
-          accountId: dbCred.accountId,
-          amount: input.amount,
-          billerId: input.billerId,
-          executedAt: new Date().toISOString(),
-        } as contracts.IntentExecutedPayload);
+          return {
+            intent: this.mapIntentToContract(executedIntent),
+            decision,
+          };
+        } else if (result.status === 'PENDING') {
+          await this.auditService.log(
+            dbCred.accountId,
+            'AI_AGENT',
+            'payment.pending_resolution',
+            {
+              intentId: savedIntent.id,
+              amount: input.amount,
+              providerRef: result.providerRef,
+            },
+          );
 
-        return {
-          intent: this.mapIntentToContract(executedIntent),
-          decision,
-        };
+          // Intent remains ALLOWED but without a Transaction record yet
+          return {
+            intent: this.mapIntentToContract(savedIntent),
+            decision,
+          };
+        } else {
+          throw new Error(result.error || 'Payment execution failed at provider');
+        }
       } catch (err) {
         const failedIntent = await this.prisma.paymentIntent.update({
           where: { id: savedIntent.id },
@@ -336,49 +358,81 @@ export class PaymentOrchestratorService implements contracts.PaymentOrchestrator
         intent.recipient || undefined,
       );
 
-      const executedIntent = await this.prisma.$transaction(async (tx) => {
-        const updated = await tx.paymentIntent.update({
-          where: { id: intentId },
-          data: { status: 'EXECUTED' },
+      if (result.status === 'SUCCESS') {
+        const executedIntent = await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.paymentIntent.update({
+            where: { id: intentId },
+            data: { status: 'EXECUTED' },
+          });
+
+          await tx.transaction.create({
+            data: {
+              intentId: intent.id,
+              providerRef: result.providerRef,
+              tokenEncrypted: result.token ? encryptToken(result.token) : null,
+            },
+          });
+
+          await tx.cosignRequest.updateMany({
+            where: { intentId, status: 'PENDING' },
+            data: { status: 'APPROVED', resolvedAt: new Date() },
+          });
+
+          return updated;
         });
 
-        await tx.transaction.create({
-          data: {
+        await this.auditService.log(
+          intent.credential.accountId,
+          'SYSTEM',
+          'payment.executed',
+          {
             intentId: intent.id,
+            amount: intent.amount,
             providerRef: result.providerRef,
-            tokenEncrypted: result.token || null,
+            cosignApproved: true,
           },
-        });
+        );
 
-        await tx.cosignRequest.updateMany({
-          where: { intentId, status: 'PENDING' },
-          data: { status: 'APPROVED', resolvedAt: new Date() },
-        });
-
-        return updated;
-      });
-
-      await this.auditService.log(
-        intent.credential.accountId,
-        'SYSTEM',
-        'payment.executed',
-        {
+        this.eventEmitter.emit(contracts.IntentEvents.Executed, {
           intentId: intent.id,
+          accountId: intent.credential.accountId,
           amount: intent.amount,
-          providerRef: result.providerRef,
-          cosignApproved: true,
-        },
-      );
+          billerId: intent.billerId || undefined,
+          executedAt: new Date().toISOString(),
+        } as contracts.IntentExecutedPayload);
 
-      this.eventEmitter.emit(contracts.IntentEvents.Executed, {
-        intentId: intent.id,
-        accountId: intent.credential.accountId,
-        amount: intent.amount,
-        billerId: intent.billerId || undefined,
-        executedAt: new Date().toISOString(),
-      } as contracts.IntentExecutedPayload);
+        return { intent: this.mapIntentToContract(executedIntent) };
+      } else if (result.status === 'PENDING') {
+        const pendingIntent = await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.paymentIntent.update({
+            where: { id: intentId },
+            data: { status: 'ALLOWED' },
+          });
 
-      return { intent: this.mapIntentToContract(executedIntent) };
+          await tx.cosignRequest.updateMany({
+            where: { intentId, status: 'PENDING' },
+            data: { status: 'APPROVED', resolvedAt: new Date() },
+          });
+
+          return updated;
+        });
+
+        await this.auditService.log(
+          intent.credential.accountId,
+          'SYSTEM',
+          'payment.pending_resolution',
+          {
+            intentId: intent.id,
+            amount: intent.amount,
+            providerRef: result.providerRef,
+            cosignApproved: true,
+          },
+        );
+
+        return { intent: this.mapIntentToContract(pendingIntent) };
+      } else {
+        throw new Error(result.error || 'Payment execution failed at provider');
+      }
     } catch (err) {
       const failedIntent = await this.prisma.$transaction(async (tx) => {
         const updated = await tx.paymentIntent.update({
@@ -435,6 +489,90 @@ export class PaymentOrchestratorService implements contracts.PaymentOrchestrator
       intentId,
       reason,
     } as contracts.IntentVoidedPayload);
+  }
+
+  async requeryIntent(intentId: string): Promise<{ intent: contracts.PaymentIntent }> {
+    const intent = await this.prisma.paymentIntent.findUnique({
+      where: { id: intentId },
+      include: {
+        credential: true,
+        transaction: true,
+      },
+    });
+
+    if (!intent) {
+      throw new Error(`Intent not found: ${intentId}`);
+    }
+
+    // Only requery if the status is ALLOWED and we do not have a transaction record yet.
+    if (intent.status === 'ALLOWED' && !intent.transaction) {
+      try {
+        const result = await this.paymentProvider.requeryStatus(intent.idempotencyKey);
+
+        if (result.status === 'SUCCESS') {
+          const executedIntent = await this.prisma.$transaction(async (tx) => {
+            const updated = await tx.paymentIntent.update({
+              where: { id: intentId },
+              data: { status: 'EXECUTED' },
+            });
+
+            await tx.transaction.create({
+              data: {
+                intentId: intent.id,
+                providerRef: result.providerRef,
+                tokenEncrypted: result.token ? encryptToken(result.token) : null,
+              },
+            });
+
+            return updated;
+          });
+
+          await this.auditService.log(
+            intent.credential.accountId,
+            'SYSTEM',
+            'payment.executed',
+            {
+              intentId: intent.id,
+              amount: intent.amount,
+              providerRef: result.providerRef,
+              requerySuccess: true,
+            },
+          );
+
+          this.eventEmitter.emit(contracts.IntentEvents.Executed, {
+            intentId: intent.id,
+            accountId: intent.credential.accountId,
+            amount: intent.amount,
+            billerId: intent.billerId || undefined,
+            executedAt: new Date().toISOString(),
+          } as contracts.IntentExecutedPayload);
+
+          return { intent: this.mapIntentToContract(executedIntent) };
+        } else if (result.status === 'FAILED') {
+          const failedIntent = await this.prisma.paymentIntent.update({
+            where: { id: intentId },
+            data: { status: 'FAILED' },
+          });
+
+          await this.auditService.log(
+            intent.credential.accountId,
+            'SYSTEM',
+            'payment.failed',
+            {
+              intentId: intent.id,
+              amount: intent.amount,
+              error: result.error || 'Payment failed during requery',
+            },
+          );
+
+          return { intent: this.mapIntentToContract(failedIntent) };
+        }
+      } catch (err) {
+        // If requeryStatus fails, just return current intent state without changing it
+      }
+    }
+
+    return { intent: this.mapIntentToContract(intent) };
   }
 
   @OnEvent(contracts.CosignEvents.Resolved)

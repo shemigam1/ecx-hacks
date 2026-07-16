@@ -49,4 +49,53 @@ describe('MockPaymentProvider', () => {
     expect(res2.token).toBeDefined();
     expect(res3.token).toBeDefined();
   });
+
+  describe('verifyCustomer', () => {
+    it('returns SUCCESS and customerName for valid recipient', async () => {
+      const res = await provider.verifyCustomer('ikeja_electric', '1234567890');
+      expect(res.status).toBe('SUCCESS');
+      expect(res.customerName).toBe('MAMA NKECHI');
+    });
+
+    it('returns FAILED for invalid recipient (starts with 999 or is fail)', async () => {
+      const res1 = await provider.verifyCustomer('ikeja_electric', '99912345');
+      const res2 = await provider.verifyCustomer('ikeja_electric', 'fail');
+
+      expect(res1.status).toBe('FAILED');
+      expect(res1.error).toBeDefined();
+      expect(res2.status).toBe('FAILED');
+    });
+  });
+
+  describe('pending & failed executions and requeryStatus', () => {
+    it('returns status PENDING when amount ends in 99 kobo', async () => {
+      const res = await provider.execute('key_pending', 999, 'ikeja_electric');
+      expect(res.status).toBe('PENDING');
+      expect(res.token).toBeUndefined();
+    });
+
+    it('returns status FAILED when amount ends in 98 kobo', async () => {
+      const res = await provider.execute('key_failed', 998, 'ikeja_electric');
+      expect(res.status).toBe('FAILED');
+      expect(res.error).toContain('Insufficient funds');
+    });
+
+    it('transitions PENDING to SUCCESS and generates token on requeryStatus', async () => {
+      // Execute as pending
+      const initial = await provider.execute('key_requery', 999, 'ikeja_electric');
+      expect(initial.status).toBe('PENDING');
+
+      // Requery
+      const queried = await provider.requeryStatus('key_requery');
+      expect(queried.status).toBe('SUCCESS');
+      expect(queried.token).toBeDefined();
+      expect(queried.token).toHaveLength(24);
+    });
+
+    it('returns FAILED error for unknown requery keys', async () => {
+      const res = await provider.requeryStatus('key_nonexistent');
+      expect(res.status).toBe('FAILED');
+      expect(res.error).toContain('Transaction not found');
+    });
+  });
 });

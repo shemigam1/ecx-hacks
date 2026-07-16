@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { PaymentProvider, PaymentResult } from './payment-provider.interface';
+import { PaymentProvider, PaymentResult, VerifyCustomerResult } from './payment-provider.interface';
 
 @Injectable()
 export class MockPaymentProvider implements PaymentProvider {
@@ -12,6 +12,23 @@ export class MockPaymentProvider implements PaymentProvider {
    */
   setLatencyEnabled(enabled: boolean) {
     this.enableLatency = enabled;
+  }
+
+  async verifyCustomer(billerId: string, recipient: string): Promise<VerifyCustomerResult> {
+    await this.simulateLatency();
+
+    if (recipient.startsWith('999') || recipient.toLowerCase() === 'fail') {
+      return {
+        customerName: '',
+        status: 'FAILED',
+        error: 'Invalid customer account or meter number',
+      };
+    }
+
+    return {
+      customerName: 'MAMA NKECHI',
+      status: 'SUCCESS',
+    };
   }
 
   async execute(
@@ -29,11 +46,21 @@ export class MockPaymentProvider implements PaymentProvider {
     // 2. Simulate external API network latency
     await this.simulateLatency();
 
-    // 3. Generate reference and check if electricity token is needed
-    const providerRef = `ref_${randomUUID().replace(/-/g, '').substring(0, 16)}`;
-    const result: PaymentResult = { providerRef };
+    // 3. Determine transaction status based on amount ending digits
+    let status: 'SUCCESS' | 'PENDING' | 'FAILED' = 'SUCCESS';
+    let error: string | undefined = undefined;
 
-    if (billerId && this.isElectricityBiller(billerId)) {
+    if (amount % 100 === 99) {
+      status = 'PENDING';
+    } else if (amount % 100 === 98) {
+      status = 'FAILED';
+      error = 'Insufficient funds at aggregator';
+    }
+
+    const providerRef = `ref_${randomUUID().replace(/-/g, '').substring(0, 16)}`;
+    const result: PaymentResult = { status, providerRef, error };
+
+    if (status === 'SUCCESS' && billerId && this.isElectricityBiller(billerId)) {
       result.token = this.generate20DigitToken();
     }
 
@@ -41,6 +68,38 @@ export class MockPaymentProvider implements PaymentProvider {
     this.cache.set(idempotencyKey, result);
 
     return result;
+  }
+
+  async requeryStatus(idempotencyKey: string): Promise<PaymentResult> {
+    await this.simulateLatency();
+
+    const cached = this.cache.get(idempotencyKey);
+    if (!cached) {
+      return {
+        status: 'FAILED',
+        providerRef: 'unknown',
+        error: 'Transaction not found',
+      };
+    }
+
+    if (cached.status === 'PENDING') {
+      // Transition from PENDING to SUCCESS upon query for test/demo simplicity
+      cached.status = 'SUCCESS';
+      // If we don't have a token but it's an electricity payment, generate it now
+      // (For this mock, let's assume we can check if a token is needed by generating a token if it's an electric ref or if we decide to)
+      // Since we don't store the original billerId directly unless we keep it in metadata or deduce it,
+      // let's assume if it is a pending transaction, it could need a token. To keep it simple,
+      // let's always generate a token upon success if it doesn't exist yet and looks like it could be electricity.
+      // Or we can store billerId in meta or cache key. Let's make cache store the original input or meta.
+      // Actually, let's check if we can check if it's electricity. Let's just generate a token if needed.
+      // Wait, we can modify the cache map to store extra data, or just generate a token for any requery that had it.
+      // Let's generate a token if the providerRef is mapped to an electricity purchase.
+      // For simplicity, let's just generate a token on requery success if the transaction was pending.
+      cached.token = this.generate20DigitToken();
+      this.cache.set(idempotencyKey, cached);
+    }
+
+    return cached;
   }
 
   private isElectricityBiller(billerId: string): boolean {
