@@ -7,7 +7,7 @@
 >
 > Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split).
 
-**Last updated:** 2026-07-15 · **Phase:** Week 0 in progress (contracts committed) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
+**Last updated:** 2026-07-16 · **Phase:** Week 1 in progress (deterministic spine) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
 
 ---
 
@@ -150,8 +150,8 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - ☑ Postgres schema + migrations (all core tables, money as integer kobo) — **A**
 - ☑ `PolicyModule` + **full unit test suite** for every rule type & boundary — **A**
 - ☑ `PaymentsModule` mock provider (20-digit token, seeded billers, latency, idempotency) — **A**
-- ☐ `AuditModule` append-only log (no delete path) — **A**
-- ☐ REST skeleton exposing intent → decision — **A**
+- ☑ `AuditModule` append-only log (no delete path) — **A**
+- ☑ REST skeleton exposing intent → decision — **A**
 - ☐ `AuthModule` scaffolding (owner OTP, delegate scoped tokens, DTMF PIN verify stub) — **B**
 - ☐ Next.js scaffold + onboarding + policy views (WCAG AA, screen-reader) — **F**
 - ☐ TTS/STT provider spike + decision — **B**
@@ -206,6 +206,7 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - **2026-07-13** — Prisma **pinned to 6.x** (do not bump to 7 without work: Prisma 7 drops in-schema
   `url` for an adapter-based `prisma.config.ts`). Full schema + `init` migration applied. Dev
   Postgres runs on host port **5544** (5432 is taken by another project on this machine).
+- **2026-07-16** — Real `PaymentOrchestrator` & `AuditModule` implemented. Validated with 7 green Jest test suites. Idempotency, transaction lifecycle, event emitting, and append-only audits are fully wired.
 
 ---
 
