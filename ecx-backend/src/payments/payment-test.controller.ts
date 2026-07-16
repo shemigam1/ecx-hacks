@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Inject, Get, Param } from '@nestjs/common';
-import type { PaymentOrchestrator, InitiatePaymentInput } from '../contracts';
+import type { PaymentOrchestrator } from '../contracts';
+import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 
 @Controller('payments')
 export class PaymentTestController {
@@ -9,7 +10,7 @@ export class PaymentTestController {
   ) {}
 
   @Post('initiate')
-  async initiate(@Body() input: InitiatePaymentInput) {
+  async initiate(@Body() input: InitiatePaymentDto) {
     return this.paymentOrchestrator.initiatePayment(input);
   }
 

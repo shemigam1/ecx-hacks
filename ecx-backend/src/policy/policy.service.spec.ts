@@ -330,4 +330,39 @@ describe('PolicyService', () => {
       expect(codes).toContain('AMOUNT_ABOVE_COSIGN_THRESHOLD');
     });
   });
+
+  describe('Edge-case amount validation', () => {
+    it('DENYs zero amounts', () => {
+      const cred: Credential = { ...baseCredential, rules: [] };
+      const intent: PaymentIntent = { ...baseIntent, amount: 0 };
+      const decision = service.evaluate(intent, cred, defaultCtx);
+      expect(decision.verdict).toBe('DENY');
+      expect(decision.reasons.map((r) => r.code)).toContain('PER_TX_CAP_EXCEEDED');
+    });
+
+    it('DENYs negative amounts', () => {
+      const cred: Credential = { ...baseCredential, rules: [] };
+      const intent: PaymentIntent = { ...baseIntent, amount: -500 };
+      const decision = service.evaluate(intent, cred, defaultCtx);
+      expect(decision.verdict).toBe('DENY');
+      expect(decision.reasons.map((r) => r.code)).toContain('PER_TX_CAP_EXCEEDED');
+    });
+
+    it('DENYs safe integer overflow amounts', () => {
+      const cred: Credential = { ...baseCredential, rules: [] };
+      const intent: PaymentIntent = { ...baseIntent, amount: Number.MAX_SAFE_INTEGER + 1 };
+      const decision = service.evaluate(intent, cred, defaultCtx);
+      expect(decision.verdict).toBe('DENY');
+      expect(decision.reasons.map((r) => r.code)).toContain('PER_TX_CAP_EXCEEDED');
+    });
+
+    it('DENYs safe integer overflow on cumulative monthly spend', () => {
+      const cred: Credential = { ...baseCredential, rules: [] };
+      const intent: PaymentIntent = { ...baseIntent, amount: 1000 };
+      const ctx = { ...defaultCtx, monthlySpentSoFar: Number.MAX_SAFE_INTEGER };
+      const decision = service.evaluate(intent, cred, ctx);
+      expect(decision.verdict).toBe('DENY');
+      expect(decision.reasons.map((r) => r.code)).toContain('PER_TX_CAP_EXCEEDED');
+    });
+  });
 });
