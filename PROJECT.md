@@ -213,6 +213,7 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - **2026-07-16** — Week 2 Spine (Dev A tasks) implemented: rolling habits calculations, real `ContextQuery` service (user context, policy translation, Tx summaries, decrypted token PIN re-auth, monthly spending sentences), and timezone-aware statistical anomaly scoring (recipient set, amount z-score, time-of-day checks). Verified with 9 passing unit test suites.
 - **2026-07-16** — ⚠️ **Spine drift for Dev A to reconcile** (Dev B did not touch spine code): (1) `PaymentProvider` regressed to `execute()`-only — not aggregator-ready per D8; (2) electricity tokens stored **plaintext** in the `tokenEncrypted` column (`token-crypto.ts` removed) — violates §10/R10; (3) `prisma/seed.ts` removed — endpoint is unit-tested only, not curl-able. See R11.
 - **2026-07-16** — Reconciled spine drift (Dev A): (1) extended `PaymentProvider` interface to be aggregator-ready with `verifyCustomer()` and `requeryStatus()`, and updated `PaymentOrchestrator` to handle `PENDING` states and requerying; (2) verified AES-GCM encryption of electricity tokens via `token-crypto.helper.ts`; (3) restored `prisma/seed.ts` and verified it runs successfully.
+- **2026-07-16** — Implemented policy edge hardening (Dev A): (1) bound NestJS global `ValidationPipe` and created `InitiatePaymentDto` to strictly validate payload parameters (amount, credential, channel, idempotencyKey); (2) updated `PolicyService` to reject zero/negative amounts and prevent safe integer overflows on payments and cumulative monthly spend.
 
 ---
 

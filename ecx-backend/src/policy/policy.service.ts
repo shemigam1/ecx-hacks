@@ -19,7 +19,27 @@ export class PolicyService implements PolicyEngine {
   ): PolicyDecision {
     const reasons: PolicyReason[] = [];
 
-    // 1. Check if credential is revoked
+    // 1. Guard against zero, negative, or fractional amounts
+    if (intent.amount <= 0 || !Number.isInteger(intent.amount)) {
+      reasons.push({
+        code: 'PER_TX_CAP_EXCEEDED',
+        detail: `Invalid transaction amount: ${intent.amount}. Amount must be a positive integer in kobo.`,
+      });
+    }
+
+    // 2. Guard against safe integer overflow bounds
+    if (
+      intent.amount > Number.MAX_SAFE_INTEGER ||
+      ctx.monthlySpentSoFar > Number.MAX_SAFE_INTEGER ||
+      ctx.monthlySpentSoFar + intent.amount > Number.MAX_SAFE_INTEGER
+    ) {
+      reasons.push({
+        code: 'PER_TX_CAP_EXCEEDED',
+        detail: 'Transaction amount or monthly cumulative spending exceeds safety bounds.',
+      });
+    }
+
+    // 3. Check if credential is revoked
     if (credential.status === 'REVOKED') {
       reasons.push({ code: 'CREDENTIAL_REVOKED' });
     }
