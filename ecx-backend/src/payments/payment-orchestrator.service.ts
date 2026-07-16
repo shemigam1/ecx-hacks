@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import * as contracts from '../contracts';
 import type { PaymentProvider } from './payment-provider.interface';
+import { encryptToken } from './token-crypto.helper';
 import type {
   PaymentIntent,
   PolicyDecision,
@@ -179,7 +180,7 @@ export class PaymentOrchestratorService implements contracts.PaymentOrchestrator
             data: {
               intentId: savedIntent.id,
               providerRef: result.providerRef,
-              tokenEncrypted: result.token || null,
+              tokenEncrypted: result.token ? encryptToken(result.token) : null,
             },
           });
 
@@ -346,7 +347,7 @@ export class PaymentOrchestratorService implements contracts.PaymentOrchestrator
           data: {
             intentId: intent.id,
             providerRef: result.providerRef,
-            tokenEncrypted: result.token || null,
+            tokenEncrypted: result.token ? encryptToken(result.token) : null,
           },
         });
 

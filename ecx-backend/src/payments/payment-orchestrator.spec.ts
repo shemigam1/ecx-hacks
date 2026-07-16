@@ -172,7 +172,7 @@ describe('PaymentOrchestratorService', () => {
         data: {
           intentId: 'intent_123',
           providerRef: 'ref_abc',
-          tokenEncrypted: 'token_123',
+          tokenEncrypted: expect.stringMatching(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/),
         },
       });
       expect(auditService.log).toHaveBeenCalledWith(

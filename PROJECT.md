@@ -159,8 +159,8 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 ### Week 2 — the agent (exit: full text-chat version of every demo scene works)
 - ☐ `AgentModule` Anthropic tool-use loop over **text first** — **B**
 - ☐ Tools: `get_user_context`, `get_policy_summary`, `list_recent_transactions`, `initiate_payment`, `read_last_token`, `request_cosign_status`, `flag_suspicious` — **B**
-- ☐ Habits + `get_user_context` (learned baselines) — **A/B**
-- ☐ Audit summarization path ("what went out this month") — **A**
+- ☑ Habits + `get_user_context` (learned baselines) — **A/B**
+- ☑ Audit summarization path ("what went out this month") — **A**
 - ☐ `CosignModule` end to end with WS + held-intent state machine — **B**
 - ☐ Demo console v1 (live intent/decision/reason stream) — **F**
 - ☐ `/cosign`, `/dashboard`, `/activity` views wired to WS/REST — **F**
@@ -172,7 +172,7 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - ☐ Token read-back (grouped digits, twice, repeat on request) — **B**
 - ☐ Local-language pass (English + Pidgin guaranteed; Yoruba if TTS holds up) — **B**
 - ☐ WhatsApp adapter **or** faithful mock (identical interface) — **B**
-- ☐ Anomaly scoring (statistical; LLM scam-script pass if time) — **A/B**
+- ☑ Anomaly scoring (statistical; LLM scam-script pass if time) — **A/B**
 - ☐ Accessibility audit of web app — **F**
 - ☐ `/demo/simulator` scam + prompt-injection scenes — **F**
 - ☐ Demo scripting + rehearsal (twice through, on real hardware) — **all**
@@ -207,6 +207,7 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
   `url` for an adapter-based `prisma.config.ts`). Full schema + `init` migration applied. Dev
   Postgres runs on host port **5544** (5432 is taken by another project on this machine).
 - **2026-07-16** — Real `PaymentOrchestrator` & `AuditModule` implemented. Validated with 7 green Jest test suites. Idempotency, transaction lifecycle, event emitting, and append-only audits are fully wired.
+- **2026-07-16** — Week 2 Spine (Dev A tasks) implemented: rolling habits calculations, real `ContextQuery` service (user context, policy translation, Tx summaries, decrypted token PIN re-auth, monthly spending sentences), and timezone-aware statistical anomaly scoring (recipient set, amount z-score, time-of-day checks). Verified with 9 passing unit test suites.
 
 ---
 
