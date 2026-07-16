@@ -7,7 +7,7 @@
 >
 > Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split) · [`FRONTEND_WORKPLAN.md`](FRONTEND_WORKPLAN.md) (Dev F) · [`docs/API_SKETCH.md`](docs/API_SKETCH.md) · [`docs/voice-latency-spike.md`](docs/voice-latency-spike.md).
 
-**Last updated:** 2026-07-16 · **Phase:** Week 1 spine landed (tested); build fixed; recalibrated. Next: Dev B AgentModule · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
+**Last updated:** 2026-07-16 · **Phase:** Week 2 spine complete; spine drift reconciled. Next: Dev B AgentModule / Web/WS API sketch · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
 
 ---
 
@@ -193,8 +193,8 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 | R7 | **Monthly-cap race / period boundary.** Two intents against a near-full cap; undefined "month." | Low | Define period boundary explicitly; sum `EXECUTED` transactions. Accept race for prototype; document it. |
 | R8 | **Float money bugs.** | Med | Integer kobo everywhere; enforce in schema + shared type. Lint/review gate. |
 | R9 | **Anthropic tool loop runaway / no confirm-before-pay.** | Low | Max tool-iteration guard; system prompt mandates confirmation; policy is external anyway (defense in depth). |
-| R10 | **Token/PIN at rest.** | Med | Tokens AES-GCM encrypted; PIN argon2 hashed; no raw audio retention; transcripts purged on session end. ⚠️ **Currently regressed** — tokens stored plaintext (see R11). |
-| R11 | **Spine drift from locked plan** (Dev A domain). Provider not aggregator-ready (D8); tokens plaintext (R10); no seed. | Med | Dev A to reconcile: restore aggregator-ready `PaymentProvider` before real-provider integration, re-add `token-crypto`, re-add `prisma/seed.ts`. Not blocking Dev B's agent work. |
+| R10 | **Token/PIN at rest.** | Med | Tokens AES-GCM encrypted; PIN argon2 hashed; no raw audio retention; transcripts purged on session end. |
+| R11 | **Spine drift from locked plan** (Dev A domain). Provider not aggregator-ready (D8); tokens plaintext (R10); no seed. | Med | ☑ Resolved — restored aggregator-ready PaymentProvider (verifyCustomer, requeryStatus, handle PENDING), re-added token-crypto, re-added prisma/seed.ts. |
 
 ---
 
@@ -212,7 +212,7 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - **2026-07-16** — Recalibration (Dev B). Contract-first validated: the spine implements `src/contracts/` cleanly. Fixed a build break on `main` (2 `import type` errors in `payment-test.controller.ts`) — **fix is local/uncommitted; commit it, `main` doesn't compile without it.** D8 re-documented (was lost in merge). Planning docs restored (`FRONTEND_WORKPLAN.md`, `docs/API_SKETCH.md`, `docs/voice-latency-spike.md`).
 - **2026-07-16** — Week 2 Spine (Dev A tasks) implemented: rolling habits calculations, real `ContextQuery` service (user context, policy translation, Tx summaries, decrypted token PIN re-auth, monthly spending sentences), and timezone-aware statistical anomaly scoring (recipient set, amount z-score, time-of-day checks). Verified with 9 passing unit test suites.
 - **2026-07-16** — ⚠️ **Spine drift for Dev A to reconcile** (Dev B did not touch spine code): (1) `PaymentProvider` regressed to `execute()`-only — not aggregator-ready per D8; (2) electricity tokens stored **plaintext** in the `tokenEncrypted` column (`token-crypto.ts` removed) — violates §10/R10; (3) `prisma/seed.ts` removed — endpoint is unit-tested only, not curl-able. See R11.
-
+- **2026-07-16** — Reconciled spine drift (Dev A): (1) extended `PaymentProvider` interface to be aggregator-ready with `verifyCustomer()` and `requeryStatus()`, and updated `PaymentOrchestrator` to handle `PENDING` states and requerying; (2) verified AES-GCM encryption of electricity tokens via `token-crypto.helper.ts`; (3) restored `prisma/seed.ts` and verified it runs successfully.
 
 ---
 

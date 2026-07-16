@@ -16,6 +16,7 @@ async function main() {
   await prisma.habit.deleteMany();
   await prisma.anomalyFlag.deleteMany();
   await prisma.conversationSession.deleteMany();
+  await prisma.auditEvent.deleteMany(); // Added to fix foreign key constraint
   await prisma.account.deleteMany();
   await prisma.user.deleteMany();
   await prisma.biller.deleteMany();

@@ -22,6 +22,9 @@ export interface PaymentOrchestrator {
 
   /** Called on cosign deny / TTL expiry. */
   voidIntent(intentId: string, reason: string): Promise<void>;
+
+  /** Recheck/requery the status of a payment intent that is currently pending execution at the provider. */
+  requeryIntent(intentId: string): Promise<{ intent: PaymentIntent }>;
 }
 
 // ---- Seam 2: read models for the agent's tools -----------------------------------------------
