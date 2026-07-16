@@ -39,7 +39,9 @@ agent transacting on a human's behalf will need.
 
 ### Non-goals (prototype)
 
-- Real bank/disco integrations (mocked behind a provider interface)
+- Real *bank* integrations / settlement (mocked). **Note (D8, 2026-07-15):** real **bill/VAS**
+  integration is now an in-scope goal — sandbox-real by default via an aggregator behind the
+  `PaymentProvider` interface, plus one genuinely-live low-value flow. Mock kept as fallback.
 - Voice biometric authentication (soft-signal design documented, not implemented)
 - USSD channel (roadmap mention only)
 - Production-grade KYC, licensing, settlement
@@ -159,8 +161,10 @@ zero AI involvement. **This boundary is the product.**
 - **WebAdapter:** REST + WebSocket gateway for the Next.js app
 
 ### PaymentsModule
-- `PaymentProvider` interface: `resolveBiller()`, `vendElectricity(meterNo, amount) → { token }`,
-  `paySubscription()`, `transfer()`
+- `PaymentProvider` interface — **aggregator-ready (D8)**: `resolveBiller()`,
+  `verifyCustomer(billerId, meterNo) → { name, address }` (meter lookup before vend),
+  `vendElectricity(meterNo, amount) → { token } | { status: 'PENDING', providerRef }`,
+  `requeryStatus(providerRef)`, `paySubscription()`, `transfer()`. Idempotency via provider `request_id`.
 - `MockProvider` implementation with realistic latencies, token generation (20-digit), and a seeded set
   of billers (Ikeja Electric, EKEDC, DSTV, GOtv, MTN airtime)
 - Idempotency keys on all payment calls

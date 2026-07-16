@@ -5,9 +5,9 @@
 > [PRD](#reference). Keep it current: when you finish a task, flip its box and update the
 > "Last updated" line. When you make a decision, add it to the Decision Log. Don't let it rot.
 >
-> Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split).
+> Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split) · [`FRONTEND_WORKPLAN.md`](FRONTEND_WORKPLAN.md) (Dev F) · [`docs/API_SKETCH.md`](docs/API_SKETCH.md).
 
-**Last updated:** 2026-07-13 · **Phase:** Week 0 in progress (contracts committed) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
+**Last updated:** 2026-07-15 · **Phase:** Week 1 — **spine exit gate met** (curl-able ALLOW/ESCALATE/DENY) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
 
 ---
 
@@ -36,7 +36,8 @@ These were open questions in the PRD. They are now settled. Do not relitigate wi
 | D4 | Cosign on a live phone call | **Async callback** | Agent says "I'll ask your daughter and call/text you back," ends the leg. Intent stays **held**; resolves after cosign. Requires held-intent state machine (see §5). |
 | D5 | ORM / migrations | **Prisma** | Fast typed migrations + trivial jsonb. Sits beside Nest DI (not decorator-based). Dev A owns `prisma/schema.prisma`. |
 | D6 | WS transport | **socket.io** (`@nestjs/platform-socket.io`) | Built-in reconnect/rooms for cosign + demo console; matches frontend socket.io client. |
-| D7 | Idempotency key | **`{channel}:{sessionId}:{turnId}`**, minted by the channel adapter per user utterance | One utterance ⇒ at most one payment; safe retries. |
+| D7 | Idempotency key | **`{channel}:{sessionId}:{turnId}`**, minted by the channel adapter per user utterance | One utterance ⇒ at most one payment; safe retries. Maps to the real provider's `request_id`. |
+| D8 | Payments strategy | **Real API, sandbox by default + one genuinely-live low-value flow** (e.g. ₦50 airtime). Mock kept as fallback. Full live money is on the table (KYC + funding available). **Specific provider deferred** (VTpass front-runner). | `PaymentProvider` interface must be **aggregator-ready now**: `verifyCustomer` (meter lookup before vend), `vend` returning token **or PENDING** + provider ref, `requeryStatus`. Revisits R5-style KYC-timeline risk. |
 
 **Still open** (decide by end of Week 1): TTS provider for Nigerian voices (Spitch / YarnGPT spike).
 
@@ -142,16 +143,18 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - ☑ `PolicyRule.params` jsonb schema per `rule_type` documented — encoded as the `PolicyRule` union in [`contracts/policy.ts`](ecx-backend/src/contracts/policy.ts) — **A**
 - ☑ Idempotency-key scheme decided — D7 `{channel}:{sessionId}:{turnId}` — **A + B**
 - ☑ Prisma init + full schema + first migration (`20260713165553_init`) + docker-compose Postgres (host port **5544**) — **A**
-- ☐ REST + WS API sketch agreed (endpoints, payloads) — **A + B + F**
-- ☐ Nest module skeletons (Agent/Channels/Cosign/Auth) + `EventEmitter2` + socket.io gateway — **B**
+- ◐ REST + WS API sketch — **draft** in [`docs/API_SKETCH.md`](docs/API_SKETCH.md), pending A+B+F ratification — **A + B + F**
+- ☑ Nest module skeletons (Agent/Channels/Cosign/Auth) + `PrismaModule`/service + `EventEmitter2` + socket.io `WebGateway` + `DevAuthGuard` — app boots clean, `GET / → 200`, 9/9 tests — **B**
+- ☑ Voice-latency spike **planned** for W1 — [`docs/voice-latency-spike.md`](docs/voice-latency-spike.md) — **B**
 - ☐ Repo layout: confirm monorepo vs separate frontend; add `frontend/` — **F**
 
 ### Week 1 — the spine (exit: a curl-able intent returns ALLOW/ESCALATE/DENY + reasons)
 - ☐ Postgres schema + migrations (all core tables, money as integer kobo) — **A**
-- ☐ `PolicyModule` + **full unit test suite** for every rule type & boundary — **A**
-- ☐ `PaymentsModule` mock provider (20-digit token, seeded billers, latency, idempotency) — **A**
-- ☐ `AuditModule` append-only log (no delete path) — **A**
-- ☐ REST skeleton exposing intent → decision — **A**
+- ☑ `PolicyModule` + **full unit test suite** (24 tests: every rule type, both boundaries, precedence, revocation, tz/overnight windows, F1/F2 scenes) — [`src/policy/`](ecx-backend/src/policy) — **A**
+- ☑ `PaymentsModule`: aggregator-ready `PaymentProvider` (D8) + `MockProvider` (20-digit token, seeded billers, latency); AES-GCM token encryption at rest — **A**
+- ☑ `PaymentOrchestratorService` (Seam 1): intent → policy → ALLOW executes / ESCALATE emits `intent.escalated` / DENY records; idempotent; resume/void with revocation re-check — **A**
+- ☑ `AuditModule` append-only log + `audit.appended` — **A**
+- ☑ REST `POST /api/intents` (dev-auth guarded) + `GET /api/intents/:id`; Prisma **seed** (billers, owner+contact, demo credential+rules). **Verified end-to-end via curl: all verdicts + idempotency + 400/401.** — **A**
 - ☐ `AuthModule` scaffolding (owner OTP, delegate scoped tokens, DTMF PIN verify stub) — **B**
 - ☐ Next.js scaffold + onboarding + policy views (WCAG AA, screen-reader) — **F**
 - ☐ TTS/STT provider spike + decision — **B**
@@ -206,6 +209,18 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - **2026-07-13** — Prisma **pinned to 6.x** (do not bump to 7 without work: Prisma 7 drops in-schema
   `url` for an adapter-based `prisma.config.ts`). Full schema + `init` migration applied. Dev
   Postgres runs on host port **5544** (5432 is taken by another project on this machine).
+- **2026-07-13** — Backend skeletons wired (Prisma/Auth/Agent/Channels/Cosign + socket.io gateway +
+  EventEmitter). `@nestjs/event-emitter` **pinned to 3.0.1** — 3.1.0 fails to resolve `ModuleRef` in
+  `EventSubscribersLoader` under Nest 11.1.28 (do not bump without testing boot). App boots clean.
+- **2026-07-15** — D8 payments strategy locked: sandbox-real default + one live low-value flow; mock as
+  fallback; full live money viable (KYC + funding available); provider choice deferred. `PaymentProvider`
+  interface to be built aggregator-ready (see D8). Real integration is now a **goal**, not the PRD's
+  original non-goal — updated `PRD.md` §2 accordingly.
+- **2026-07-15** — Week-1 spine exit gate met: PolicyModule + PaymentsModule + Orchestrator + `POST
+  /api/intents`, verified end-to-end. Two notes for agents: (1) `prisma/` is excluded from `tsconfig.build.json`
+  so `nest build` emits `dist/main.js` (adding compiled files outside `src/` shifts the out dir — don't undo).
+  (2) `BILLER_NOT_ALLOWLISTED` is for a **real** biller off the credential's allowlist; `payment_intents.billerId`
+  is a FK, so an unknown biller id errors rather than denies. Seed keeps `ibedc` off the allowlist to demo this.
 
 ---
 

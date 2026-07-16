@@ -106,7 +106,7 @@ demo console apply it. Until it exists, Dev A uses a dev-only header stub.
 
 ### Dev A
 - **W0:** schema draft + migration tooling; ship `PaymentOrchestrator`/`ContextQuery` **interfaces + fakes**; agree event names.
-- **W1:** full schema + migrations (money = integer kobo); `PolicyModule` + **exhaustive boundary tests** (cap met / cap+₦1 / revoked / expired / channel scope; DENY>ESCALATE>ALLOW precedence); `PaymentsModule` mock provider (20-digit token, seeded billers, latency, idempotency); `AuditModule` append-only; real `PaymentOrchestrator`; REST endpoint to curl an intent → decision.
+- **W1:** full schema + migrations (money = integer kobo); `PolicyModule` + **exhaustive boundary tests** (cap met / cap+₦1 / revoked / expired / channel scope; DENY>ESCALATE>ALLOW precedence); `PaymentsModule`: **aggregator-ready `PaymentProvider` interface (D8)** — `verifyCustomer`, `vend` returning token *or* PENDING+providerRef, `requeryStatus`, idempotency via provider `request_id` — plus `MockProvider` (20-digit token, seeded billers, latency); `AuditModule` append-only; real `PaymentOrchestrator`; REST endpoint to curl an intent → decision.
 - **W2:** habits computation + `ContextQuery` real impl; audit month-summary; integrate real orchestrator with Dev B; `AnomalyModule` statistical baseline (z-score/EWMA) consuming `audit.appended`.
 - **W3:** optional anomaly LLM scam-pass; policy edge hardening; demo seed data; demo-console event feed; **integration fixer** for voice.
 
