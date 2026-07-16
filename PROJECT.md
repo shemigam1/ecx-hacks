@@ -5,9 +5,9 @@
 > [PRD](#reference). Keep it current: when you finish a task, flip its box and update the
 > "Last updated" line. When you make a decision, add it to the Decision Log. Don't let it rot.
 >
-> Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split).
+> Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split) · [`FRONTEND_WORKPLAN.md`](FRONTEND_WORKPLAN.md) (Dev F) · [`docs/API_SKETCH.md`](docs/API_SKETCH.md) · [`docs/voice-latency-spike.md`](docs/voice-latency-spike.md).
 
-**Last updated:** 2026-07-16 · **Phase:** Week 1 in progress (deterministic spine) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
+**Last updated:** 2026-07-16 · **Phase:** Week 1 spine landed (tested); build fixed; recalibrated. Next: Dev B AgentModule · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
 
 ---
 
@@ -37,8 +37,9 @@ These were open questions in the PRD. They are now settled. Do not relitigate wi
 | D5 | ORM / migrations | **Prisma** | Fast typed migrations + trivial jsonb. Sits beside Nest DI (not decorator-based). Dev A owns `prisma/schema.prisma`. |
 | D6 | WS transport | **socket.io** (`@nestjs/platform-socket.io`) | Built-in reconnect/rooms for cosign + demo console; matches frontend socket.io client. |
 | D7 | Idempotency key | **`{channel}:{sessionId}:{turnId}`**, minted by the channel adapter per user utterance | One utterance ⇒ at most one payment; safe retries. |
+| D8 | Payments strategy + model | Real API, **sandbox by default + one live low-value flow**; mock as fallback; full live money viable (KYC+funding available); provider **deferred** (VTpass front-runner). Agent brain = **Qwen3 via OpenRouter** behind a swappable `LlmProvider` (model is not a trust boundary). | ⚠️ `PaymentProvider` interface must be **aggregator-ready** (`verifyCustomer`/PENDING/`requeryStatus`). **Currently NOT met in the committed spine — see Drift, §8.** |
 
-**Still open** (decide by end of Week 1): TTS provider for Nigerian voices (Spitch / YarnGPT spike).
+**Still open** (decide by end of Week 1): TTS provider for Nigerian voices (Spitch / YarnGPT spike); specific payment provider (deferred, D8).
 
 ---
 
@@ -192,7 +193,8 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 | R7 | **Monthly-cap race / period boundary.** Two intents against a near-full cap; undefined "month." | Low | Define period boundary explicitly; sum `EXECUTED` transactions. Accept race for prototype; document it. |
 | R8 | **Float money bugs.** | Med | Integer kobo everywhere; enforce in schema + shared type. Lint/review gate. |
 | R9 | **Anthropic tool loop runaway / no confirm-before-pay.** | Low | Max tool-iteration guard; system prompt mandates confirmation; policy is external anyway (defense in depth). |
-| R10 | **Token/PIN at rest.** | Med | Tokens AES-GCM encrypted; PIN argon2 hashed; no raw audio retention; transcripts purged on session end. |
+| R10 | **Token/PIN at rest.** | Med | Tokens AES-GCM encrypted; PIN argon2 hashed; no raw audio retention; transcripts purged on session end. ⚠️ **Currently regressed** — tokens stored plaintext (see R11). |
+| R11 | **Spine drift from locked plan** (Dev A domain). Provider not aggregator-ready (D8); tokens plaintext (R10); no seed. | Med | Dev A to reconcile: restore aggregator-ready `PaymentProvider` before real-provider integration, re-add `token-crypto`, re-add `prisma/seed.ts`. Not blocking Dev B's agent work. |
 
 ---
 
@@ -206,7 +208,9 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - **2026-07-13** — Prisma **pinned to 6.x** (do not bump to 7 without work: Prisma 7 drops in-schema
   `url` for an adapter-based `prisma.config.ts`). Full schema + `init` migration applied. Dev
   Postgres runs on host port **5544** (5432 is taken by another project on this machine).
-- **2026-07-16** — Real `PaymentOrchestrator` & `AuditModule` implemented. Validated with 7 green Jest test suites. Idempotency, transaction lifecycle, event emitting, and append-only audits are fully wired.
+- **2026-07-16** — Real `PaymentOrchestrator` & `AuditModule` implemented (PRs #1–3, shemigam1). Validated with 7 green Jest test suites. Idempotency, transaction lifecycle, event emitting, and append-only audits are fully wired.
+- **2026-07-16** — Recalibration (Dev B). Contract-first validated: the spine implements `src/contracts/` cleanly. Fixed a build break on `main` (2 `import type` errors in `payment-test.controller.ts`) — **fix is local/uncommitted; commit it, `main` doesn't compile without it.** D8 re-documented (was lost in merge). Planning docs restored (`FRONTEND_WORKPLAN.md`, `docs/API_SKETCH.md`, `docs/voice-latency-spike.md`).
+- **2026-07-16** — ⚠️ **Spine drift for Dev A to reconcile** (Dev B did not touch spine code): (1) `PaymentProvider` regressed to `execute()`-only — not aggregator-ready per D8; (2) electricity tokens stored **plaintext** in the `tokenEncrypted` column (`token-crypto.ts` removed) — violates §10/R10; (3) `prisma/seed.ts` removed — endpoint is unit-tested only, not curl-able. See R11.
 
 ---
 
