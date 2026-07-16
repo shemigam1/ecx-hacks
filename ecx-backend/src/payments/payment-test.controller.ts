@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Inject } from '@nestjs/common';
-import { PaymentOrchestrator, InitiatePaymentInput } from '../contracts';
+import type { PaymentOrchestrator, InitiatePaymentInput } from '../contracts';
 
 @Controller('payments')
 export class PaymentTestController {
