@@ -7,7 +7,7 @@
 >
 > Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split).
 
-**Last updated:** 2026-07-13 · **Phase:** Week 0 in progress (contracts committed) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
+**Last updated:** 2026-07-15 · **Phase:** Week 0 in progress (contracts committed) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
 
 ---
 
@@ -148,7 +148,7 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 
 ### Week 1 — the spine (exit: a curl-able intent returns ALLOW/ESCALATE/DENY + reasons)
 - ☐ Postgres schema + migrations (all core tables, money as integer kobo) — **A**
-- ☐ `PolicyModule` + **full unit test suite** for every rule type & boundary — **A**
+- ☑ `PolicyModule` + **full unit test suite** for every rule type & boundary — **A**
 - ☐ `PaymentsModule` mock provider (20-digit token, seeded billers, latency, idempotency) — **A**
 - ☐ `AuditModule` append-only log (no delete path) — **A**
 - ☐ REST skeleton exposing intent → decision — **A**
