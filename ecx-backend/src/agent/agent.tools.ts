@@ -31,7 +31,7 @@ export const AGENT_TOOLS: LlmToolDef[] = [
     parameters: {
       type: 'object',
       properties: {
-        billerId: { type: 'string', description: 'e.g. ikeja_electric, eko_electric, dstv, gotv, mtn_airtime' },
+        billerId: { type: 'string', description: 'the biller by name, e.g. "Ikeja Electric", "DSTV", "MTN Airtime" (aliases like "light"/"nepa" are fine)' },
         recipient: { type: 'string', description: 'meter number (electricity) or account number (transfer)' },
         amount: { type: 'integer', description: 'amount in kobo, e.g. 500000 for ₦5,000' },
       },

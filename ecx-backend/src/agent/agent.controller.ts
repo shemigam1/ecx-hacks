@@ -23,14 +23,14 @@ export class AgentController {
 
   @Post('message')
   async message(@Body() body: AgentMessageDto) {
-    const ctx: AgentSessionContext = {
+    const ctx = await this.agent.resolveContext({
       sessionId: body.sessionId ?? randomUUID(),
-      userId: body.userId ?? 'user_owner',
-      accountId: body.accountId ?? 'acct_demo',
-      credentialId: body.credentialId ?? 'cred_demo',
       channel: body.channel ?? 'WEB',
-      reauthOk: body.reauthOk ?? false,
-    };
+      userId: body.userId,
+      accountId: body.accountId,
+      credentialId: body.credentialId,
+      reauthOk: body.reauthOk,
+    });
     const out = await this.agent.handleMessage(ctx, body.text ?? '');
     return { sessionId: ctx.sessionId, ...out };
   }

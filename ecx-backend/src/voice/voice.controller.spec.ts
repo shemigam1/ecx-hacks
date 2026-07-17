@@ -3,14 +3,12 @@ import { FakeSttProvider } from './fake-stt.provider';
 import { VoiceController } from './voice.controller';
 
 function make(agentReply: AgentReply, transcript = 'buy me light') {
-  const agent = { handleMessage: jest.fn().mockResolvedValue(agentReply) };
-  const stt = new FakeSttProvider(transcript);
-  const prisma = {
-    user: { findFirst: jest.fn().mockResolvedValue(null) },
-    account: { findFirst: jest.fn().mockResolvedValue(null) },
-    credential: { findFirst: jest.fn().mockResolvedValue(null) },
+  const agent = {
+    handleMessage: jest.fn().mockResolvedValue(agentReply),
+    resolveContext: jest.fn().mockResolvedValue({ sessionId: 's', channel: 'VOICE', userId: 'u', accountId: 'a', credentialId: 'c', reauthOk: false }),
   };
-  return { ctrl: new VoiceController(agent as any, stt, prisma as any), agent };
+  const stt = new FakeSttProvider(transcript);
+  return { ctrl: new VoiceController(agent as any, stt), agent };
 }
 
 const NO_PAYMENT: AgentReply = { reply: 'Five thousand naira for Ikeja Electric?', toolTrace: [] };

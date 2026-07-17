@@ -22,7 +22,14 @@ function makeService(llm: FakeLlmProvider, orchestrator: any) {
     readLastToken: jest.fn().mockResolvedValue('1234 5678 9012 3456 7890'),
   };
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
-  const prisma = { transaction: { findUnique: jest.fn().mockResolvedValue({ tokenEncrypted: '1234 5678 9012 3456 7890' }) }, cosignRequest: { findUnique: jest.fn().mockResolvedValue(null) } };
+  const prisma = {
+    transaction: { findUnique: jest.fn().mockResolvedValue({ tokenEncrypted: '1234 5678 9012 3456 7890' }) },
+    cosignRequest: { findUnique: jest.fn().mockResolvedValue(null) },
+    biller: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([{ id: 'ikeja_electric', name: 'Ikeja Electric', aliases: ['ikeja', 'light'] }]),
+    },
+  };
   return new AgentService(llm as any, orchestrator, context as any, audit as any, prisma as any);
 }
 

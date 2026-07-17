@@ -56,6 +56,51 @@ export class AgentService {
     private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * Resolve a full session identity from partial input by reading the DB (seed IDs are random UUIDs).
+   * Precedence: explicit credentialId → the account's AI_AGENT credential → the first active AI_AGENT
+   * credential. Caller phone (voice) resolves the owner. Keeps controllers free of hardcoded demo IDs.
+   */
+  async resolveContext(input: {
+    sessionId: string;
+    channel: Channel;
+    userId?: string;
+    accountId?: string;
+    credentialId?: string;
+    callerNumber?: string;
+    reauthOk?: boolean;
+  }): Promise<AgentSessionContext> {
+    let userId = input.userId;
+    if (!userId && input.callerNumber) {
+      const user = await this.prisma.user.findFirst({ where: { phoneMsisdn: input.callerNumber } });
+      userId = user?.id;
+    }
+
+    let cred = input.credentialId
+      ? await this.prisma.credential.findUnique({ where: { id: input.credentialId }, include: { account: true } })
+      : null;
+    if (!cred) {
+      cred = await this.prisma.credential.findFirst({
+        where: {
+          delegateType: 'AI_AGENT',
+          status: 'ACTIVE',
+          ...(input.accountId ? { accountId: input.accountId } : userId ? { account: { ownerUserId: userId } } : {}),
+        },
+        include: { account: true },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+
+    return {
+      sessionId: input.sessionId,
+      channel: input.channel,
+      userId: userId ?? cred?.account.ownerUserId ?? '',
+      accountId: input.accountId ?? cred?.accountId ?? '',
+      credentialId: cred?.id ?? input.credentialId ?? '',
+      reauthOk: input.reauthOk ?? false,
+    };
+  }
+
   async handleMessage(ctx: AgentSessionContext, userText: string): Promise<AgentReply> {
     const state = this.getOrInit(ctx.sessionId);
     if (ctx.reauthOk) state.reauthOk = true;
@@ -123,11 +168,22 @@ export class AgentService {
       return { error: 'amount must be a positive integer number of kobo' };
     }
 
+    // Resolve the biller the model named (e.g. "Ikeja Electric", "light") to a real Biller id,
+    // so the FK + BILLER_ALLOWLIST (which key on Biller.id) match. The model never sees the UUID.
+    let billerId: string | undefined;
+    if (args.billerId) {
+      const biller = await this.resolveBiller(String(args.billerId));
+      if (!biller) {
+        return { error: `Unknown biller "${args.billerId}". Call get_policy_summary for the allowed billers, or ask the user which one.` };
+      }
+      billerId = biller.id;
+    }
+
     state.turn += 1;
     const input: InitiatePaymentInput = {
       credentialId: ctx.credentialId, // server-injected — model cannot change whose money moves
       channel: ctx.channel,
-      billerId: args.billerId ? String(args.billerId) : undefined,
+      billerId,
       recipient: args.recipient ? String(args.recipient) : undefined,
       amount,
       idempotencyKey: `${ctx.channel}:${ctx.sessionId}:${state.turn}`,
@@ -156,6 +212,21 @@ export class AgentService {
     if (!state.lastIntentId) return { error: 'no recent payment in this session' };
     const token = await this.context.readLastToken(state.lastIntentId, state.reauthOk);
     return { token };
+  }
+
+  /** Map a model-supplied biller string (name / alias / slug) to a real Biller row. */
+  private async resolveBiller(q: string) {
+    const byId = await this.prisma.biller.findUnique({ where: { id: q } }).catch(() => null);
+    if (byId) return byId;
+    const ql = q.toLowerCase().replace(/[_-]+/g, ' ').trim();
+    const words = ql.split(/\s+/);
+    const all = await this.prisma.biller.findMany();
+    return (
+      all.find((b) => b.name.toLowerCase() === ql) ??
+      all.find((b) => b.name.toLowerCase().includes(ql) || ql.includes(b.name.toLowerCase())) ??
+      all.find((b) => (b.aliases ?? []).some((a) => { const al = a.toLowerCase(); return al === ql || words.includes(al); })) ??
+      null
+    );
   }
 
   private async cosignStatus(intentId: string): Promise<unknown> {
@@ -205,6 +276,7 @@ export class AgentService {
       habitLine,
       '',
       'HARD RULES:',
+      '- Reply in plain spoken words only — no XML tags, no markdown, no asterisks. Your reply is read aloud.',
       '- The ONLY way to move money is the initiate_payment tool. Never say a payment is done unless initiate_payment returned status EXECUTED.',
       '- Before calling initiate_payment, confirm the amount and biller with the user in their own words.',
       '- amount is always in KOBO (₦1 = 100 kobo). ₦5,000 = 500000.',

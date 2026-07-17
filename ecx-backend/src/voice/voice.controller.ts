@@ -1,7 +1,6 @@
 import { Body, Controller, Header, Inject, Post } from '@nestjs/common';
 import { AgentService } from '../agent/agent.service';
 import type { AgentReply, AgentSessionContext } from '../agent/agent.service';
-import { PrismaService } from '../prisma/prisma.service';
 import { STT_PROVIDER } from './stt-provider';
 import type { SttProvider } from './stt-provider';
 import { getDigits, hangup, record, response, say, speakDigits } from './at-response';
@@ -42,7 +41,6 @@ export class VoiceController {
   constructor(
     private readonly agent: AgentService,
     @Inject(STT_PROVIDER) private readonly stt: SttProvider,
-    private readonly prisma: PrismaService,
   ) {}
 
   @Post('incoming')
@@ -156,20 +154,8 @@ export class VoiceController {
     return sessionId ? this.sessions.get(sessionId) : undefined;
   }
 
-  private async resolveContext(sessionId: string, callerNumber?: string): Promise<AgentSessionContext> {
-    const user = callerNumber ? await this.prisma.user.findFirst({ where: { phoneMsisdn: callerNumber } }) : null;
-    const account = user ? await this.prisma.account.findFirst({ where: { ownerUserId: user.id } }) : null;
-    const cred = account
-      ? await this.prisma.credential.findFirst({ where: { accountId: account.id, delegateType: 'AI_AGENT', status: 'ACTIVE' } })
-      : null;
-    return {
-      sessionId,
-      userId: user?.id ?? 'user_owner',
-      accountId: account?.id ?? 'acct_demo',
-      credentialId: cred?.id ?? 'cred_demo',
-      channel: 'VOICE',
-      reauthOk: false,
-    };
+  private resolveContext(sessionId: string, callerNumber?: string): Promise<AgentSessionContext> {
+    return this.agent.resolveContext({ sessionId, channel: 'VOICE', callerNumber });
   }
 }
 
