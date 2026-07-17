@@ -117,6 +117,10 @@ export class FakePaymentOrchestrator implements PaymentOrchestrator {
     this.mustGet(intentId).status = 'VOIDED';
   }
 
+  async requeryIntent(intentId: string) {
+    return { intent: this.mustGet(intentId) };
+  }
+
   private mustGet(intentId: string): PaymentIntent {
     const intent = this.intents.get(intentId);
     if (!intent) throw new Error(`FakePaymentOrchestrator: unknown intent ${intentId}`);

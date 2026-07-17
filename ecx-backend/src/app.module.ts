@@ -7,6 +7,10 @@ import { PaymentsModule } from './payments/payments.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditModule } from './audit/audit.module';
 import { AnomalyModule } from './anomaly/anomaly.module';
+import { AgentModule } from './agent/agent.module';
+import { ChannelsModule } from './channels/channels.module';
+import { CosignModule } from './cosign/cosign.module';
+import { VoiceModule } from './voice/voice.module';
 
 @Module({
   imports: [
@@ -16,6 +20,10 @@ import { AnomalyModule } from './anomaly/anomaly.module';
     PaymentsModule,
     AuditModule,
     AnomalyModule,
+    AgentModule,
+    ChannelsModule,
+    CosignModule,
+    VoiceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
