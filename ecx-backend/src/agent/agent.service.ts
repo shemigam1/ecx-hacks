@@ -1,9 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type { Channel, InitiatePaymentInput, PaymentOrchestrator, UserContext } from '../contracts';
+import type { Channel, ContextQuery, InitiatePaymentInput, PaymentOrchestrator, UserContext } from '../contracts';
 import { LLM_PROVIDER } from '../llm/llm-provider';
 import type { LlmMessage, LlmProvider, LlmToolCall } from '../llm/llm-provider';
-import { ContextQueryService } from '../context/context-query.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AGENT_TOOLS } from './agent.tools';
@@ -52,7 +51,7 @@ export class AgentService {
   constructor(
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     @Inject('PaymentOrchestrator') private readonly orchestrator: PaymentOrchestrator,
-    private readonly context: ContextQueryService,
+    @Inject('ContextQuery') private readonly context: ContextQuery,
     private readonly audit: AuditService,
     private readonly prisma: PrismaService,
   ) {}
@@ -146,7 +145,8 @@ export class AgentService {
       hint: this.verdictHint(decision.verdict),
     };
     if (intent.status === 'EXECUTED') {
-      const token = await this.tokenForIntent(intent.id);
+      // Read via ContextQuery so the AES-GCM token is decrypted (they just authenticated to pay).
+      const token = await this.context.readLastToken(intent.id, true).catch(() => undefined);
       if (token) result.token = token;
     }
     return result;
@@ -167,11 +167,6 @@ export class AgentService {
   private async flagSuspicious(ctx: AgentSessionContext, reason: string): Promise<unknown> {
     await this.audit.log(ctx.accountId, 'AI_AGENT', 'suspicious.flagged', { reason, sessionId: ctx.sessionId });
     return { acknowledged: true };
-  }
-
-  private async tokenForIntent(intentId: string): Promise<string | undefined> {
-    const tx = await this.prisma.transaction.findUnique({ where: { intentId } });
-    return tx?.tokenEncrypted ?? undefined;
   }
 
   // ---- helpers --------------------------------------------------------------------------------

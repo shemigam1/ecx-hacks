@@ -7,7 +7,7 @@
 >
 > Related docs: [`PRD.md`](PRD.md) (product spec) · [`AGENTS.md`](AGENTS.md) (agent working rules) · [`BACKEND_WORKPLAN.md`](BACKEND_WORKPLAN.md) (Dev A/B split) · [`FRONTEND_WORKPLAN.md`](FRONTEND_WORKPLAN.md) (Dev F) · [`docs/API_SKETCH.md`](docs/API_SKETCH.md) · [`docs/voice-latency-spike.md`](docs/voice-latency-spike.md).
 
-**Last updated:** 2026-07-16 · **Phase:** Week 2 spine complete; spine drift reconciled. Next: Dev B AgentModule / Web/WS API sketch · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
+**Last updated:** 2026-07-17 · **Phase:** Backend feature-complete (spine + Agent + Cosign + WS + Voice first cut). Remaining: real STT/TTS + AuthModule (Dev B), whole frontend (Dev F) · **Timeline:** ~3 weeks · **Team:** 2 backend (A, B) + 1 frontend (F)
 
 ---
 
@@ -158,19 +158,19 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - ☐ TTS/STT provider spike + decision — **B**
 
 ### Week 2 — the agent (exit: full text-chat version of every demo scene works)
-- ☐ `AgentModule` Anthropic tool-use loop over **text first** — **B**
-- ☐ Tools: `get_user_context`, `get_policy_summary`, `list_recent_transactions`, `initiate_payment`, `read_last_token`, `request_cosign_status`, `flag_suspicious` — **B**
+- ☑ `AgentModule` tool-use loop over text — **Qwen3/OpenRouter** behind swappable `LlmProvider` (not Anthropic); wired to spine `PaymentOrchestrator` + `ContextQuery` tokens; `POST /agent/message`; server-injected identity, runaway guard — **B**
+- ☑ All 7 tools + dispatcher (`get_user_context`, `get_policy_summary`, `list_recent_transactions`, `initiate_payment`, `read_last_token`, `request_cosign_status`, `flag_suspicious`) — **B**
 - ☑ Habits + `get_user_context` (learned baselines) — **A/B**
 - ☑ Audit summarization path ("what went out this month") — **A**
-- ☐ `CosignModule` end to end with WS + held-intent state machine — **B**
+- ☑ `CosignModule` end to end with WS + held-intent state machine — `GET /cosign/pending`, `POST /cosign/:id/resolve` → emits `cosign.resolved` → orchestrator resumes/voids; socket.io `WebGateway` (D6) bridges `intent.*`/`cosign.*` to clients — **B**
 - ☐ Demo console v1 (live intent/decision/reason stream) — **F**
 - ☐ `/cosign`, `/dashboard`, `/activity` views wired to WS/REST — **F**
 
 ### Week 3 — voice & polish (exit: live feature-phone call works twice in a row)
-- ☐ Africa's Talking VoiceAdapter (answer/record/play, `GetDigits` for PIN+confirm) — **B**
-- ☐ STT→LLM→TTS pipeline with "one moment" filler + pre-generated clips — **B**
-- ☐ DTMF PIN auth + lockout + trusted-contact notify — **B**
-- ☐ Token read-back (grouped digits, twice, repeat on request) — **B**
+- ☑ Africa's Talking VoiceAdapter — webhook state machine (`/voice/incoming|pin|intent|confirm|repeat`), `GetDigits` (PIN+confirm), `Record` (intent), AT `<Say>` TTS; reuses `AgentService`. XML builders + flow unit-tested; DTMF flow verified live via curl — **B**
+- ◐ STT→LLM→TTS pipeline — `SttProvider` seam + `FakeSttProvider` + AT `<Say>` TTS + agent loop wired; **pending:** real Whisper STT adapter, "one moment" filler + pre-generated clips — **B**
+- ◐ DTMF PIN auth + lockout — demo-PIN + 3-attempt lockout done; **pending (AuthModule):** real argon2 PIN + trusted-contact notify — **B**
+- ☑ Token read-back (grouped digits `speakDigits`, twice, press-1-to-repeat) — **B**
 - ☐ Local-language pass (English + Pidgin guaranteed; Yoruba if TTS holds up) — **B**
 - ☐ WhatsApp adapter **or** faithful mock (identical interface) — **B**
 - ☑ Anomaly scoring (statistical; LLM scam-script pass if time) — **A/B**
@@ -214,6 +214,9 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - **2026-07-16** — ⚠️ **Spine drift for Dev A to reconcile** (Dev B did not touch spine code): (1) `PaymentProvider` regressed to `execute()`-only — not aggregator-ready per D8; (2) electricity tokens stored **plaintext** in the `tokenEncrypted` column (`token-crypto.ts` removed) — violates §10/R10; (3) `prisma/seed.ts` removed — endpoint is unit-tested only, not curl-able. See R11.
 - **2026-07-16** — Reconciled spine drift (Dev A): (1) extended `PaymentProvider` interface to be aggregator-ready with `verifyCustomer()` and `requeryStatus()`, and updated `PaymentOrchestrator` to handle `PENDING` states and requerying; (2) verified AES-GCM encryption of electricity tokens via `token-crypto.helper.ts`; (3) restored `prisma/seed.ts` and verified it runs successfully.
 - **2026-07-16** — Implemented policy edge hardening (Dev A): (1) bound NestJS global `ValidationPipe` and created `InitiatePaymentDto` to strictly validate payload parameters (amount, credential, channel, idempotencyKey); (2) updated `PolicyService` to reject zero/negative amounts and prevent safe integer overflows on payments and cumulative monthly spend.
+- **2026-07-17** — Dev B: **AgentModule integrated** into `AppModule` (was orphaned) + deduped — dropped my `src/context/`, agent now uses Dev A's `'ContextQuery'` token (which decrypts tokens); fixed token read-back to decrypt via `ContextQuery`. Installed `openai` + WS libs (were missing); fixed stale `FakePaymentOrchestrator` (`requeryIntent`). **Built CosignModule + socket.io WebGateway (D6):** `GET /cosign/pending`, `POST /cosign/:id/resolve` → `cosign.resolved` → orchestrator resumes/voids; gateway broadcasts `intent.*`/`cosign.*`. Build clean, **90 tests / 11 suites**, boots with all routes mapped. (User commits; I don't.)
+- **2026-07-17** — Dev B: **Week-3 voice adapter (first cut)** — `src/voice/`: AT webhook state machine (greeting → DTMF PIN → record intent → STT → `AgentService` → DTMF confirm → digit-by-digit token read-back), `SttProvider` seam + fake, pure AT XML builders. Build clean, **101 tests / 13 suites** (+11 voice); DTMF flow verified live via curl. Needs for live: `PUBLIC_BASE_URL`, `OPENROUTER_API_KEY`, a real Whisper STT adapter; PIN is a demo PIN until AuthModule.
+- **2026-07-17** — ⚠️ Note for Dev A: `nest build` emits to `dist/src/main.js` (not `dist/main.js`) because `prisma/seed.ts` sits outside `src/` and pulls the rootDir up — breaks `start:prod` (`node dist/main`). Fix: exclude `prisma` in `tsconfig.build.json` or set `rootDir: ./src`.
 
 ---
 
