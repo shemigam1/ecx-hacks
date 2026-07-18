@@ -83,7 +83,12 @@ export class VoiceController {
     const session = this.session(body.sessionId);
     if (!session || !session.verified) return response(say('Sorry, please call again and enter your PIN.'), hangup());
 
-    const transcript = body.recordingUrl ? await this.stt.transcribe(body.recordingUrl) : '';
+    let transcript = '';
+    try {
+      transcript = body.recordingUrl ? await this.stt.transcribe(body.recordingUrl) : '';
+    } catch {
+      transcript = ''; // STT failure → treat as unheard and re-prompt, never 500 the call
+    }
     if (!transcript.trim()) {
       return response(record({ path: '/voice/intent', maxLength: 15 }, say('I did not catch that. Please say it again after the beep.')));
     }
