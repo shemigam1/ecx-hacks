@@ -2,6 +2,7 @@ import { Logger, Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AgentModule } from '../agent/agent.module';
 import { AuthModule } from '../auth/auth.module';
+import { SessionModule } from '../session/session.module';
 import { VoiceController } from './voice.controller';
 import { STT_PROVIDER } from './stt-provider';
 import { FakeSttProvider } from './fake-stt.provider';
@@ -12,7 +13,7 @@ import { WhisperSttProvider } from './whisper-stt.provider';
  * is set (gap #8), else the FakeSttProvider for offline/tests. TTS is AT's built-in `<Say>`.
  */
 @Module({
-  imports: [PrismaModule, AgentModule, AuthModule],
+  imports: [PrismaModule, AgentModule, AuthModule, SessionModule],
   controllers: [VoiceController],
   providers: [
     {

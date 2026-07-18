@@ -17,7 +17,14 @@ function make(agentReply: AgentReply, transcript = 'buy me light') {
       return { ok: false, locked: attempts >= 3 };
     }),
   };
-  return { ctrl: new VoiceController(agent as any, stt, auth as any), agent };
+  // In-memory SessionStore fake so state persists across webhook calls within a test.
+  const mem = new Map<string, unknown>();
+  const store = {
+    load: jest.fn(async (id: string) => mem.get(id) ?? null),
+    save: jest.fn(async (id: string, _u: string, _c: string, state: unknown) => { mem.set(id, JSON.parse(JSON.stringify(state))); }),
+    delete: jest.fn(async (id: string) => { mem.delete(id); }),
+  };
+  return { ctrl: new VoiceController(agent as any, stt, auth as any, store as any), agent };
 }
 
 const NO_PAYMENT: AgentReply = { reply: 'Five thousand naira for Ikeja Electric?', toolTrace: [] };

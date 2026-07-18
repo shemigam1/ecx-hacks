@@ -5,6 +5,7 @@ import { LLM_PROVIDER } from '../llm/llm-provider';
 import type { LlmMessage, LlmProvider, LlmToolCall } from '../llm/llm-provider';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SessionStore } from '../session/session.store';
 import { AGENT_TOOLS } from './agent.tools';
 
 /** Who the agent is acting for this session. Injected server-side — never chosen by the model. */
@@ -46,7 +47,6 @@ const MAX_TOOL_ROUNDS = 6;
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
-  private readonly sessions = new Map<string, SessionState>(); // TODO(week2): persist to conversation_sessions
 
   constructor(
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
@@ -54,6 +54,7 @@ export class AgentService {
     @Inject('ContextQuery') private readonly context: ContextQuery,
     private readonly audit: AuditService,
     private readonly prisma: PrismaService,
+    private readonly store: SessionStore,
   ) {}
 
   /**
@@ -102,7 +103,8 @@ export class AgentService {
   }
 
   async handleMessage(ctx: AgentSessionContext, userText: string): Promise<AgentReply> {
-    const state = this.getOrInit(ctx.sessionId);
+    const state: SessionState =
+      (await this.store.load<SessionState>(ctx.sessionId)) ?? { messages: [], turn: 0, reauthOk: false };
     if (ctx.reauthOk) state.reauthOk = true;
 
     if (state.messages.length === 0) {
@@ -128,10 +130,12 @@ export class AgentService {
 
       const reply = res.text ?? '';
       state.messages.push({ role: 'assistant', content: reply });
+      await this.store.save(ctx.sessionId, ctx.userId, ctx.channel, state);
       return { reply, toolTrace };
     }
 
     this.logger.warn(`session ${ctx.sessionId} hit MAX_TOOL_ROUNDS`);
+    await this.store.save(ctx.sessionId, ctx.userId, ctx.channel, state);
     return { reply: "I'm sorry, I couldn't complete that safely just now. Please try again.", toolTrace };
   }
 
@@ -241,15 +245,6 @@ export class AgentService {
   }
 
   // ---- helpers --------------------------------------------------------------------------------
-
-  private getOrInit(sessionId: string): SessionState {
-    let s = this.sessions.get(sessionId);
-    if (!s) {
-      s = { messages: [], turn: 0, reauthOk: false };
-      this.sessions.set(sessionId, s);
-    }
-    return s;
-  }
 
   private verdictHint(verdict: string): string {
     switch (verdict) {
