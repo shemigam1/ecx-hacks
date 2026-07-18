@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { AuditModule } from '../audit/audit.module';
+import { SessionModule } from '../session/session.module';
 import { LLM_PROVIDER } from '../llm/llm-provider';
 import { OpenRouterLlmProvider } from '../llm/openrouter.provider';
 import { AgentService } from './agent.service';
@@ -14,7 +15,7 @@ import { AgentController } from './agent.controller';
  * the model is not a trust boundary.
  */
 @Module({
-  imports: [PrismaModule, PaymentsModule, AuditModule],
+  imports: [PrismaModule, PaymentsModule, AuditModule, SessionModule],
   controllers: [AgentController],
   providers: [AgentService, { provide: LLM_PROVIDER, useClass: OpenRouterLlmProvider }],
   exports: [AgentService],

@@ -30,7 +30,8 @@ function makeService(llm: FakeLlmProvider, orchestrator: any) {
       findMany: jest.fn().mockResolvedValue([{ id: 'ikeja_electric', name: 'Ikeja Electric', aliases: ['ikeja', 'light'] }]),
     },
   };
-  return new AgentService(llm as any, orchestrator, context as any, audit as any, prisma as any);
+  const store = { load: jest.fn().mockResolvedValue(null), save: jest.fn().mockResolvedValue(undefined) };
+  return new AgentService(llm as any, orchestrator, context as any, audit as any, prisma as any, store as any);
 }
 
 describe('AgentService', () => {

@@ -8,7 +8,23 @@ function make(agentReply: AgentReply, transcript = 'buy me light') {
     resolveContext: jest.fn().mockResolvedValue({ sessionId: 's', channel: 'VOICE', userId: 'u', accountId: 'a', credentialId: 'c', reauthOk: false }),
   };
   const stt = new FakeSttProvider(transcript);
-  return { ctrl: new VoiceController(agent as any, stt), agent };
+  // Stateful auth stub: '0000' passes; three wrong attempts lock.
+  let attempts = 0;
+  const auth = {
+    verifyPin: jest.fn(async (_userId: string, pin: string) => {
+      if (pin === '0000') { attempts = 0; return { ok: true, locked: false }; }
+      attempts += 1;
+      return { ok: false, locked: attempts >= 3 };
+    }),
+  };
+  // In-memory SessionStore fake so state persists across webhook calls within a test.
+  const mem = new Map<string, unknown>();
+  const store = {
+    load: jest.fn(async (id: string) => mem.get(id) ?? null),
+    save: jest.fn(async (id: string, _u: string, _c: string, state: unknown) => { mem.set(id, JSON.parse(JSON.stringify(state))); }),
+    delete: jest.fn(async (id: string) => { mem.delete(id); }),
+  };
+  return { ctrl: new VoiceController(agent as any, stt, auth as any, store as any), agent };
 }
 
 const NO_PAYMENT: AgentReply = { reply: 'Five thousand naira for Ikeja Electric?', toolTrace: [] };
@@ -22,7 +38,7 @@ describe('VoiceController', () => {
     const { ctrl } = make(NO_PAYMENT);
     const xml = await ctrl.incoming({ sessionId: 's1', callerNumber: '+2348030000001' });
     expect(xml).toContain('<GetDigits');
-    expect(xml).toContain('callbackUrl="/voice/pin"');
+    expect(xml).toContain('/voice/pin?k=');
     expect(xml).toContain('PIN');
   });
 
@@ -31,7 +47,7 @@ describe('VoiceController', () => {
     await ctrl.incoming({ sessionId: 's1' });
     const xml = await ctrl.pin({ sessionId: 's1', dtmfDigits: '0000' });
     expect(xml).toContain('<Record');
-    expect(xml).toContain('callbackUrl="/voice/intent"');
+    expect(xml).toContain('/voice/intent?k=');
   });
 
   it('locks the channel after 3 wrong PINs', async () => {
@@ -48,7 +64,7 @@ describe('VoiceController', () => {
     await ctrl.incoming({ sessionId: 's3' });
     await ctrl.pin({ sessionId: 's3', dtmfDigits: '0000' });
     const xml = await ctrl.intent({ sessionId: 's3', recordingUrl: 'http://rec' });
-    expect(xml).toContain('callbackUrl="/voice/confirm"');
+    expect(xml).toContain('/voice/confirm?k=');
     expect(xml).toContain('Press 1 to confirm');
   });
 
@@ -58,7 +74,7 @@ describe('VoiceController', () => {
     await ctrl.pin({ sessionId: 's4', dtmfDigits: '0000' });
     const xml = await ctrl.intent({ sessionId: 's4', recordingUrl: 'http://rec' });
     expect(xml).toContain('1 2 3 4, 5 6 7 8, 9 0 1 2, 3 4 5 6, 7 8 9 0');
-    expect(xml).toContain('callbackUrl="/voice/repeat"');
+    expect(xml).toContain('/voice/repeat?k=');
   });
 
   it('requires PIN before accepting an intent', async () => {
