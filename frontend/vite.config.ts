@@ -17,6 +17,8 @@ export default defineConfig({
       '/auth': proxy,
       '/voice': proxy,
       '/socket.io': { ...proxy, ws: true },
+      '/accounts': proxy,
+      '/credentials': proxy,
     },
   },
 });
