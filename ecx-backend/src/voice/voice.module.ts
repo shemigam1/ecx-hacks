@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AgentModule } from '../agent/agent.module';
+import { AuthModule } from '../auth/auth.module';
 import { VoiceController } from './voice.controller';
 import { STT_PROVIDER } from './stt-provider';
 import { FakeSttProvider } from './fake-stt.provider';
@@ -10,7 +11,7 @@ import { FakeSttProvider } from './fake-stt.provider';
  * swap in a Whisper-compatible adapter behind STT_PROVIDER. TTS is AT's built-in `<Say>`.
  */
 @Module({
-  imports: [PrismaModule, AgentModule],
+  imports: [PrismaModule, AgentModule, AuthModule],
   controllers: [VoiceController],
   providers: [{ provide: STT_PROVIDER, useClass: FakeSttProvider }],
 })

@@ -1,6 +1,7 @@
 import { Body, Controller, Header, Inject, Post } from '@nestjs/common';
 import { AgentService } from '../agent/agent.service';
 import type { AgentReply, AgentSessionContext } from '../agent/agent.service';
+import { AuthService } from '../auth/auth.service';
 import { STT_PROVIDER } from './stt-provider';
 import type { SttProvider } from './stt-provider';
 import { getDigits, hangup, record, response, say, speakDigits } from './at-response';
@@ -19,13 +20,10 @@ interface AtWebhookBody {
 
 interface VoiceSession {
   ctx: AgentSessionContext;
-  pinAttempts: number;
   verified: boolean;
   lastToken?: string;
 }
 
-const DEMO_PIN = process.env.VOICE_DEMO_PIN ?? '0000'; // TODO: AuthModule owns real argon2 DTMF PIN + lockout
-const MAX_PIN_ATTEMPTS = 3;
 const XML = 'application/xml';
 
 /**
@@ -41,6 +39,7 @@ export class VoiceController {
   constructor(
     private readonly agent: AgentService,
     @Inject(STT_PROVIDER) private readonly stt: SttProvider,
+    private readonly auth: AuthService,
   ) {}
 
   @Post('incoming')
@@ -48,7 +47,7 @@ export class VoiceController {
   async incoming(@Body() body: AtWebhookBody): Promise<string> {
     const sessionId = body.sessionId ?? `sess_${Date.now()}`;
     const ctx = await this.resolveContext(sessionId, body.callerNumber);
-    this.sessions.set(sessionId, { ctx, pinAttempts: 0, verified: false });
+    this.sessions.set(sessionId, { ctx, verified: false });
 
     return response(
       getDigits({ path: '/voice/pin', finishOnKey: '#', timeout: 30 }, say('Welcome to Steward. Please enter your PIN, then press hash.')),
@@ -61,7 +60,8 @@ export class VoiceController {
     const session = this.session(body.sessionId);
     if (!session) return response(say('Sorry, your session expired. Please call again.'), hangup());
 
-    if ((body.dtmfDigits ?? '') === DEMO_PIN) {
+    const result = await this.auth.verifyPin(session.ctx.userId, body.dtmfDigits ?? '');
+    if (result.ok) {
       session.verified = true;
       session.ctx.reauthOk = true;
       return response(
@@ -69,10 +69,8 @@ export class VoiceController {
       );
     }
 
-    session.pinAttempts += 1;
-    if (session.pinAttempts >= MAX_PIN_ATTEMPTS) {
-      // TODO(AuthModule): notify trusted contact on lockout.
-      return response(say('That PIN was not correct three times. For your safety, I am ending the call.'), hangup());
+    if (result.locked) {
+      return response(say('That PIN was not correct too many times. For your safety, I have locked this and alerted your trusted contact. Goodbye.'), hangup());
     }
     return response(
       getDigits({ path: '/voice/pin' }, say('That PIN was not correct. Please enter your PIN, then press hash.')),

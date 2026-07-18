@@ -8,7 +8,16 @@ function make(agentReply: AgentReply, transcript = 'buy me light') {
     resolveContext: jest.fn().mockResolvedValue({ sessionId: 's', channel: 'VOICE', userId: 'u', accountId: 'a', credentialId: 'c', reauthOk: false }),
   };
   const stt = new FakeSttProvider(transcript);
-  return { ctrl: new VoiceController(agent as any, stt), agent };
+  // Stateful auth stub: '0000' passes; three wrong attempts lock.
+  let attempts = 0;
+  const auth = {
+    verifyPin: jest.fn(async (_userId: string, pin: string) => {
+      if (pin === '0000') { attempts = 0; return { ok: true, locked: false }; }
+      attempts += 1;
+      return { ok: false, locked: attempts >= 3 };
+    }),
+  };
+  return { ctrl: new VoiceController(agent as any, stt, auth as any), agent };
 }
 
 const NO_PAYMENT: AgentReply = { reply: 'Five thousand naira for Ikeja Electric?', toolTrace: [] };

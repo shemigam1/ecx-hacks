@@ -27,6 +27,14 @@ export class WebGateway implements OnGatewayConnection {
   @WebSocketServer() server!: Server;
 
   handleConnection(client: Socket) {
+    // WS handshake auth (gap #7): client connects with io(url, { auth: { token } }) or ?k=.
+    const key = process.env.INTERNAL_API_KEY ?? 'dev-steward-key';
+    const provided = client.handshake.auth?.token ?? client.handshake.query?.k;
+    if (provided !== key) {
+      client.emit('unauthorized', { message: 'invalid or missing key' });
+      client.disconnect(true);
+      return;
+    }
     client.emit('connected', { ok: true, id: client.id });
   }
 
