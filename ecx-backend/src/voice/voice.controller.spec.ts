@@ -22,7 +22,7 @@ describe('VoiceController', () => {
     const { ctrl } = make(NO_PAYMENT);
     const xml = await ctrl.incoming({ sessionId: 's1', callerNumber: '+2348030000001' });
     expect(xml).toContain('<GetDigits');
-    expect(xml).toContain('callbackUrl="/voice/pin"');
+    expect(xml).toContain('/voice/pin?k=');
     expect(xml).toContain('PIN');
   });
 
@@ -31,7 +31,7 @@ describe('VoiceController', () => {
     await ctrl.incoming({ sessionId: 's1' });
     const xml = await ctrl.pin({ sessionId: 's1', dtmfDigits: '0000' });
     expect(xml).toContain('<Record');
-    expect(xml).toContain('callbackUrl="/voice/intent"');
+    expect(xml).toContain('/voice/intent?k=');
   });
 
   it('locks the channel after 3 wrong PINs', async () => {
@@ -48,7 +48,7 @@ describe('VoiceController', () => {
     await ctrl.incoming({ sessionId: 's3' });
     await ctrl.pin({ sessionId: 's3', dtmfDigits: '0000' });
     const xml = await ctrl.intent({ sessionId: 's3', recordingUrl: 'http://rec' });
-    expect(xml).toContain('callbackUrl="/voice/confirm"');
+    expect(xml).toContain('/voice/confirm?k=');
     expect(xml).toContain('Press 1 to confirm');
   });
 
@@ -58,7 +58,7 @@ describe('VoiceController', () => {
     await ctrl.pin({ sessionId: 's4', dtmfDigits: '0000' });
     const xml = await ctrl.intent({ sessionId: 's4', recordingUrl: 'http://rec' });
     expect(xml).toContain('1 2 3 4, 5 6 7 8, 9 0 1 2, 3 4 5 6, 7 8 9 0');
-    expect(xml).toContain('callbackUrl="/voice/repeat"');
+    expect(xml).toContain('/voice/repeat?k=');
   });
 
   it('requires PIN before accepting an intent', async () => {

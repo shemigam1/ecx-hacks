@@ -11,13 +11,13 @@ describe('AT response builders', () => {
 
   it('getDigits sets the callback path and numDigits', () => {
     const xml = getDigits({ path: '/voice/confirm', numDigits: 1 }, say('press one'));
-    expect(xml).toContain('callbackUrl="/voice/confirm"');
+    expect(xml).toContain('callbackUrl="/voice/confirm?k=');
     expect(xml).toContain('numDigits="1"');
     expect(xml).toContain('<Say');
   });
 
   it('record points at the intent callback', () => {
-    expect(record({ path: '/voice/intent' }, say('go'))).toContain('callbackUrl="/voice/intent"');
+    expect(record({ path: '/voice/intent' }, say('go'))).toContain('callbackUrl="/voice/intent?k=');
   });
 
   it('speakDigits spaces digits and groups by four for slow read-back', () => {

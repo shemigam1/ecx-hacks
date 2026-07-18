@@ -14,7 +14,11 @@ export function xmlEscape(s: string): string {
 
 export function callbackUrl(path: string): string {
   const base = process.env.PUBLIC_BASE_URL ?? '';
-  return `${base}${path}`;
+  // Voice webhooks are hit by Africa's Talking, which can't send our x-api-key header — carry the
+  // shared secret in the URL so the global ApiKeyGuard accepts it (gap #6). The AT-dashboard
+  // /voice/incoming URL must also include ?k=<INTERNAL_API_KEY>.
+  const key = process.env.INTERNAL_API_KEY ?? 'dev-steward-key';
+  return `${base}${path}?k=${encodeURIComponent(key)}`;
 }
 
 /** `<Say>` — AT's built-in TTS. */

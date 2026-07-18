@@ -22,6 +22,21 @@ export const CosignEvents = {
   Resolved: 'cosign.resolved',
 } as const;
 
+export const DemoEvents = {
+  /** DemoModule emits for every scene (incl. DENY, which has no intent.* event). WebGateway bridges to WS. */
+  Decision: 'demo.decision',
+} as const;
+
+export interface DemoDecisionPayload {
+  scenario: string;
+  intentId: string;
+  verdict: string;
+  status: string;
+  reasons: string[];
+  amount: Kobo;
+  billerName?: string;
+}
+
 export interface IntentEscalatedPayload {
   intentId: string;
   accountId: string;

@@ -8,9 +8,10 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { CosignEvents, IntentEvents } from '../contracts';
+import { CosignEvents, DemoEvents, IntentEvents } from '../contracts';
 import type {
   CosignResolvedPayload,
+  DemoDecisionPayload,
   IntentEscalatedPayload,
   IntentExecutedPayload,
   IntentVoidedPayload,
@@ -59,5 +60,11 @@ export class WebGateway implements OnGatewayConnection {
   @OnEvent(CosignEvents.Resolved)
   onCosignResolved(p: CosignResolvedPayload) {
     this.server.emit(CosignEvents.Resolved, p);
+  }
+
+  /** Demo scene driver: broadcast every scenario's verdict (incl. DENY) to the console. */
+  @OnEvent(DemoEvents.Decision)
+  onDemoDecision(p: DemoDecisionPayload) {
+    this.server.emit(DemoEvents.Decision, p);
   }
 }

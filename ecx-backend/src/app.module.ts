@@ -11,10 +11,13 @@ import { AgentModule } from './agent/agent.module';
 import { ChannelsModule } from './channels/channels.module';
 import { CosignModule } from './cosign/cosign.module';
 import { VoiceModule } from './voice/voice.module';
+import { DemoModule } from './demo/demo.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
+    AuthModule,
     PrismaModule,
     PolicyModule,
     PaymentsModule,
@@ -24,6 +27,7 @@ import { VoiceModule } from './voice/voice.module';
     ChannelsModule,
     CosignModule,
     VoiceModule,
+    DemoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
