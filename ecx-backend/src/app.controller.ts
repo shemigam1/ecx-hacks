@@ -6,8 +6,9 @@ import { Public } from './auth/public.decorator';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  // Health at /health so that `/` falls through to the served SPA (gap #18).
   @Public()
-  @Get()
+  @Get('health')
   getHello(): string {
     return this.appService.getHello();
   }
