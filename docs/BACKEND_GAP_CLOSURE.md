@@ -2,7 +2,7 @@
 
 > Turning "core done + live-verified" into "backend ready," gap by gap. Organized by three readiness
 > bars so it's clear what unblocks what. Deep Dev-B task detail lives in [`DEVB_PLAN.md`](DEVB_PLAN.md);
-> this doc is the readiness checklist + remediation. _Last updated 2026-07-17._
+> this doc is the readiness checklist + remediation. _Last updated 2026-07-18._
 
 ## Readiness bars
 - **Bar 1 — Tier-1 demo-ready** (web console demo works reliably, no telephony).
@@ -29,31 +29,34 @@
 | 12 | **Payments still mock** (no real rail) | VTpass/Flutterwave **sandbox** behind `PaymentProvider` (D8); start KYC if going live-money | **A** | 2/opt | 1–2d | Sandbox vend returns a real token via the same interface |
 | 13 | **English-only TTS** (AT `<Say>`) | Pidgin via `<Say>` text now; `TtsProvider` + `<Play>` (YarnGPT/Spitch) for Yoruba | **B** | opt | 1d | Pidgin prompt spoken; Yoruba via Play if TTS holds |
 | 14 | **No WhatsApp channel** | WhatsApp adapter or faithful mock → same `ConversationEvent` → `AgentService` | **B** | opt | 1d | A WhatsApp (or mock) message drives the agent |
+| 15 | ✅ **Web read endpoints** (Activity/Policy pages had none) | **Done** — `GET /accounts/:id/audit`, `GET /credentials/:id/policy`, `POST /credentials/:id/revoke` (revoke is audited). `src/accounts/`. Live-verified + 4 unit tests. Unblocks the frontend Activity + Policy pages. | **B** | 1 | done | ✓ |
+| 16 | ✅ **Cosign JWT attribution** | **Done** — `CosignController` is `@UseGuards(JwtAuthGuard)`; `resolve` takes `byUserId` from `@CurrentPrincipal`, body field ignored (now optional). Live: `/cosign/pending` 401 without Bearer, 200 with. | **B** | 3 | done | ✓ |
+| 17 | ✅ **Audit vocabulary** | **Done** — `/accounts/:id/audit` maps `payment.executed/denied/escalated/voided` → `intent.*` so the FE `describe()` renders plain speech. Live-verified. | **B** | 1 | done | ✓ |
+| 18 | ✅ **Single-origin serving** | **Done** — `ServeStaticModule` serves `frontend/dist` (conditional; no-op in dev). Health moved to `/health` so `/` serves the SPA. Live: `/` → index.html, API stays JSON, `/cosign` (client route) → index.html. Override path via `FRONTEND_DIST`. | **B** | 2 | done | ✓ |
 
 ---
 
-## Sequence (recommended)
+## Remaining open gaps — ordered plan (2026-07-18)
 
-**To hit Bar 1 (Tier-1 demo-ready) — do first:**
-1. #1 scene driver (B) → unblocks Dev F's console.
-2. #6 light auth guard on state-changing routes (B) — cheap, closes the worst of the open-endpoint risk.
-3. #2 commit (you); #3 time window + #5 build fix + #4 meter (A — small).
+**Done:** #1 scene driver · #6 api-key guard · #7 AuthModule · #8 Whisper STT · #10 session persistence
+· #11 per-account WS rooms · #15 web read endpoints · #16 cosign JWT · #17 audit vocabulary · #18
+single-origin serving. **Bars 1 & 3 are met; all quick wins closed.** What's left:
 
-**To hit Bar 2 (live voice):**
-4. #8 Whisper STT (B) → #9 live wiring + latency mask (B + your ngrok/AT creds) → rehearse one F1 call.
+**Live voice — Bar 2 (needs your creds):**
+- **#9** Live wiring — `PUBLIC_BASE_URL` (ngrok) + Africa's Talking sandbox callback config + one rehearsed F1 call. STT is ready (#8) — set `STT_API_KEY`.
+- **#13** Local-language TTS (optional) — Pidgin via `<Say>` now; YarnGPT/Spitch via `<Play>` for Yoruba.
 
-**To hit Bar 3 (secured & robust):**
-5. #7 AuthModule (B) → replaces demo PIN, supersedes the #6 interim guard.
-6. #10 session persistence, #11 WS rooms (B).
+**Dev A (spine/seed — flagged, I won't touch):**
+- **#3** Widen the demo credential's `TIME_WINDOW` (15m) — else evening ALLOW/ESCALATE demo scenes hit `OUTSIDE_TIME_WINDOW`.
+- **#4** Seed a meter into `get_user_context` (½d) — so F1 uses a real meter, not a hallucinated one.
+- **#5** `start:prod` build fix (15m) — exclude `prisma` in `tsconfig.build.json`.
+- **#12** Real payment provider + KYC (optional, only if going live-money).
 
-**Optional / stretch:** #12 real provider (A, if going live-money), #13 local-language TTS, #14 WhatsApp.
-
-## What I (Dev B) will build vs. what I need from others
-- **Mine:** #1, #6, #7, #8, #9(code), #10, #11, #13, #14.
-- **Yours:** #2 commit; ngrok/public URL + Africa's Talking sandbox creds for #9. (OpenRouter key ✅ done.)
-- **Dev A:** #3 (widen demo window), #4 (seed meter), #5 (build fix), #12 (real provider) — I'll flag these; I won't touch spine/seed code.
+**Small follow-ups (from #7):** real SMS delivery for OTP + lockout notify; delegate-scoped JWTs.
+**Optional:** **#14** WhatsApp adapter/mock.
 
 ## Definition of "backend ready"
-- **Bar 1:** ✅ #1–#5 (+ #6). Tier-1 demo runs end to end from the web.
-- **Bar 2:** ✅ + #8, #9. A live F1 call completes and reads the token back.
-- **Bar 3:** ✅ + #7, #10, #11. Endpoints authenticated, sessions durable.
+- **Bar 1 (Tier-1 web demo): ✅ met.** Scene driver + auth + web read endpoints done. Only Dev A's #3
+  (widen time window) is needed to make the ALLOW/ESCALATE scenes green at any hour.
+- **Bar 2 (live voice):** #9 wiring (your ngrok/AT creds) + set `STT_API_KEY`.
+- **Bar 3 (secured & robust): ✅ met.** Auth, sessions, per-account rooms all done; #16 further tightens cosign attribution.
