@@ -25,7 +25,7 @@ export function DemoSimulator() {
             <h1 id="sim-heading" className="mb-1 text-3xl font-bold">Scenario simulator</h1>
             <p className="mb-4 max-w-3xl text-gray-700">
                 Fire a canned scene through the <strong>real</strong> deterministic policy engine (no LLM
-                involved), then watch the <Link to="/demo/console" className="font-bold text-blue-700 underline">Console</Link>{' '}
+                involved), then watch the <Link to="/demo/console" className="font-bold text-brand-700 underline">Console</Link>{' '}
                 react — open it in a second window for the split-screen judge view.
             </p>
 
@@ -44,7 +44,7 @@ export function DemoSimulator() {
 
             <div className="grid gap-4 sm:grid-cols-2">
                 {scenarios.data?.map((s) => (
-                    <div key={s.name} className="rounded-xl border border-gray-200 p-4">
+                    <div key={s.name} className="rounded-xl border border-gray-200 bg-white shadow-sm p-4">
                         <p className="flex flex-wrap items-center gap-2">
                             <span className="font-mono font-bold">{s.name}</span>
                             <span className="text-sm text-gray-500">expected:</span>
@@ -55,7 +55,7 @@ export function DemoSimulator() {
                             type="button"
                             onClick={() => run.mutate(s.name)}
                             disabled={run.isPending}
-                            className="mt-3 font-bold text-blue-700 underline disabled:opacity-50"
+                            className="mt-3 font-bold text-brand-700 underline disabled:opacity-50"
                         >
                             Fire this scene
                         </button>
@@ -71,7 +71,7 @@ export function DemoSimulator() {
                     </p>
                 )}
                 {last && (
-                    <div className="rounded-xl border border-gray-200 p-4">
+                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4">
                         <h2 className="mb-2 text-xl font-bold">
                             Result: <span className="font-mono">{last.scenario}</span>
                         </h2>

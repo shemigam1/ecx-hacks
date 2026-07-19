@@ -35,14 +35,19 @@ describe('AuthService', () => {
     });
   });
 
-  describe('OTP → JWT', () => {
-    it('issues a verifiable JWT on the correct code and rejects a wrong one', async () => {
-      const { svc } = make({ id: 'u1', phoneMsisdn: '+2348030000001', role: 'OWNER' });
-      const { devCode } = svc.requestOtp('+2348030000001');
-      const { token, principal } = await svc.verifyOtp('+2348030000001', devCode!);
+  describe('passcode login → JWT', () => {
+    it('issues a verifiable JWT on the correct passcode and rejects a wrong one', async () => {
+      const { svc } = make({ id: 'u1', phoneMsisdn: '+2348030000001', role: 'OWNER', pinHash: await argon2.hash('4821') });
+      const { token, principal } = await svc.loginWithPasscode('+2348030000001', '4821');
       expect(principal.userId).toBe('u1');
       expect(svc.verifyToken(token).userId).toBe('u1');
-      await expect(svc.verifyOtp('+2348030000001', '000000')).rejects.toThrow();
+      await expect(svc.loginWithPasscode('+2348030000001', '0000')).rejects.toThrow();
+    });
+
+    it('accepts the demo passcode for a seeded user with no real hash', async () => {
+      const { svc } = make({ id: 'u2', phoneMsisdn: '+2348030000002', role: 'TRUSTED_CONTACT' });
+      const { principal } = await svc.loginWithPasscode('+2348030000002', '0000');
+      expect(principal.role).toBe('TRUSTED_CONTACT');
     });
   });
 });

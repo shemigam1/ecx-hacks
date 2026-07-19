@@ -12,8 +12,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/agent': proxy,
-      '/demo': proxy,
-      '/cosign': proxy,
+      // NB: prefixes must not swallow SPA page routes. '/demo' would capture the /demo/console and
+      // /demo/simulator pages on hard reload, and '/cosign' the /cosign page — so match only the
+      // actual API paths ('/demo/scenario' also prefixes '/demo/scenarios'; '/cosign/' matches
+      // /cosign/pending and /cosign/:id/resolve but not the bare /cosign page).
+      '/demo/scenario': proxy,
+      '/cosign/': proxy,
       '/auth': proxy,
       '/voice': proxy,
       '/socket.io': { ...proxy, ws: true },

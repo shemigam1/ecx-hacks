@@ -25,15 +25,15 @@ export function Dashboard() {
             <p className="mb-6">Live view of this session. The full monthly picture arrives when the summary endpoint ships.</p>
 
             <div className="mb-6 grid gap-4 sm:grid-cols-3" aria-live="polite">
-                <div className="rounded-lg border border-gray-300 p-4 dark:border-zinc-700">
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                     <p className="text-sm">Paid (this session)</p>
                     <p className="text-2xl font-bold">{formatNaira(total)}</p>
                 </div>
-                <div className="rounded-lg border border-gray-300 p-4 dark:border-zinc-700">
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                     <p className="text-sm">Payments executed</p>
                     <p className="text-2xl font-bold">{executed.length}</p>
                 </div>
-                <div className="rounded-lg border border-gray-300 p-4 dark:border-zinc-700">
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                     <p className="text-sm">Held for approval</p>
                     <p className="text-2xl font-bold">{held}</p>
                 </div>
@@ -43,7 +43,7 @@ export function Dashboard() {
             <ul className="flex flex-col gap-2">
                 {executed.length === 0 && <li>No payments yet this session.</li>}
                 {executed.map((p) => (
-                    <li key={p.intentId} className="rounded border border-gray-300 p-3 dark:border-zinc-700">
+                    <li key={p.intentId} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
                         {formatNaira(p.amount)} · {new Date(p.executedAt).toLocaleTimeString('en-NG')}
                     </li>
                 ))}

@@ -3,7 +3,7 @@ import { api, ApiError } from '../lib/api';
 import { getPrincipal } from '../lib/authStore';
 import { explainReason } from '../lib/reasonText';
 
-interface AuditRow {
+export interface AuditRow {
     id?: string;
     eventType: string;
     actorType?: string;
@@ -43,9 +43,9 @@ export function Activity() {
 
             <ol className="flex flex-col gap-2">
                 {audit.data?.map((row, i) => (
-                    <li key={row.id ?? i} className="rounded border border-gray-300 p-3 dark:border-zinc-700">
+                    <li key={row.id ?? i} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
                         <p className="font-medium">{describe(row)}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-gray-600">
                             {new Date(row.createdAt).toLocaleString('en-NG')}
                             {row.actorType ? ` · by ${row.actorType.toLowerCase().replace('_', ' ')}` : ''}
                         </p>
@@ -58,7 +58,7 @@ export function Activity() {
 }
 
 /** Plain-speech line per audit event type. Falls back to the raw type. */
-function describe(row: AuditRow): string {
+export function describe(row: AuditRow): string {
     const reason = typeof row.payload?.reason === 'string' ? row.payload.reason : undefined;
     switch (row.eventType) {
         case 'intent.created': return 'A payment was requested.';
