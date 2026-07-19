@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.git
+*.log
+# Secrets come in via env_file at runtime — never bake them into the image.
+.env
+.env.*
+!.env.example

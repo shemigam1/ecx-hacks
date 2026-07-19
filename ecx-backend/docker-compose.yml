@@ -1,4 +1,6 @@
-# Local Postgres for development. `docker compose up -d` then `pnpm prisma migrate dev`.
+# Full backend stack. `docker compose up` builds + runs the NestJS app AND Postgres together.
+# Fill your secrets in .env first (copy from .env.example). The app waits for Postgres to be healthy,
+# runs migrations + seed, then listens on http://localhost:3000.
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,6 +19,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  app:
+    build: .
+    container_name: steward-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Inside the compose network the DB is at `postgres:5432` — overrides the localhost URL in .env
+      # (which is for running the app on your host against the mapped 5544 port).
+      DATABASE_URL: postgresql://steward:steward@postgres:5432/steward?schema=public
+      PORT: 3000
+    ports:
+      - '3000:3000'
 
 volumes:
   steward_pgdata:
