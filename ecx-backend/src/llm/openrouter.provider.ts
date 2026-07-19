@@ -11,7 +11,9 @@ import { LlmMessage, LlmProvider, LlmResponse, LlmToolDef } from './llm-provider
 export class OpenRouterLlmProvider implements LlmProvider {
   private readonly logger = new Logger(OpenRouterLlmProvider.name);
   private readonly client: OpenAI;
-  private readonly model = process.env.AGENT_MODEL ?? 'qwen/qwen3-235b-a22b';
+  private readonly model = process.env.AGENT_MODEL ?? 'qwen/qwen3-32b';
+  // Cap output tokens — replies are short (spoken aloud). Overridable via AGENT_MAX_TOKENS.
+  private readonly maxTokens = Number(process.env.AGENT_MAX_TOKENS) || 400;
 
   constructor() {
     this.client = new OpenAI({
@@ -27,6 +29,7 @@ export class OpenRouterLlmProvider implements LlmProvider {
       tools: tools.map((t) => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.parameters } })),
       tool_choice: 'auto',
       temperature: 0,
+      max_tokens: this.maxTokens,
     });
 
     const choice = res.choices[0]?.message;

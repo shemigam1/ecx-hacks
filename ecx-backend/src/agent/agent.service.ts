@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type { Channel, ContextQuery, InitiatePaymentInput, PaymentOrchestrator, UserContext } from '../contracts';
+import type { Channel, ContextQuery, InitiatePaymentInput, PaymentOrchestrator, PolicySummary, UserContext } from '../contracts';
 import { LLM_PROVIDER } from '../llm/llm-provider';
 import type { LlmMessage, LlmProvider, LlmToolCall } from '../llm/llm-provider';
 import { AuditService } from '../audit/audit.service';
@@ -38,6 +38,9 @@ interface SessionState {
 }
 
 const MAX_TOOL_ROUNDS = 6;
+// Only send the system message + the most recent N messages to the model (token savings). Older turns
+// are still persisted; we just don't resend the whole history every round.
+const MAX_SENT_MESSAGES = 14;
 
 /**
  * The conversation orchestrator (PRD §6 AgentModule). Runs the LLM tool-use loop against the swappable
@@ -108,15 +111,20 @@ export class AgentService {
     if (ctx.reauthOk) state.reauthOk = true;
 
     if (state.messages.length === 0) {
-      const uc = await this.context.getUserContext(ctx.userId).catch(() => null);
-      state.messages.push({ role: 'system', content: this.systemPrompt(uc) });
+      // Preload context + rules into the system prompt so the model rarely spends extra tool rounds
+      // calling get_user_context / get_policy_summary.
+      const [uc, ps] = await Promise.all([
+        this.context.getUserContext(ctx.userId).catch(() => null),
+        this.context.getPolicySummary(ctx.credentialId).catch(() => null),
+      ]);
+      state.messages.push({ role: 'system', content: this.systemPrompt(uc, ps) });
     }
     state.messages.push({ role: 'user', content: userText });
 
     const toolTrace: ToolTraceEntry[] = [];
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const res = await this.llm.complete(state.messages, AGENT_TOOLS);
+      const res = await this.llm.complete(windowMessages(state.messages), AGENT_TOOLS);
 
       if (res.toolCalls?.length) {
         state.messages.push({ role: 'assistant', content: res.text ?? '', toolCalls: res.toolCalls });
@@ -259,16 +267,20 @@ export class AgentService {
     }
   }
 
-  private systemPrompt(uc: UserContext | null): string {
+  private systemPrompt(uc: UserContext | null, ps: PolicySummary | null): string {
     const name = uc?.name ?? 'the caller';
     const lang = uc?.languagePref ?? 'en';
     const habitLine = uc?.habits?.length
       ? `Their usual payments: ${uc.habits.map((h) => `${h.billerLabel} (~${h.typicalAmount} kobo)`).join(', ')}.`
       : '';
+    const rulesLine = ps?.humanReadable?.length
+      ? `Spending rules already in force (no need to look them up): ${ps.humanReadable.join(' ')}`
+      : '';
     return [
       `You are Steward, a warm, patient voice assistant helping ${name} pay bills. Reply briefly and clearly, suitable to be spoken aloud to an elderly person.`,
       `Preferred language code: "${lang}". If it is "pcm" use simple Nigerian Pidgin; otherwise use clear English.`,
       habitLine,
+      rulesLine,
       '',
       'HARD RULES:',
       '- Reply in plain spoken words only — no XML tags, no markdown, no asterisks. Your reply is read aloud.',
@@ -287,4 +299,18 @@ function toInt(v: unknown): number | undefined {
   if (typeof v === 'number' && Number.isInteger(v)) return v;
   if (typeof v === 'string' && /^\d+$/.test(v.trim())) return parseInt(v, 10);
   return undefined;
+}
+
+/**
+ * Keep the system message + the most recent MAX_SENT_MESSAGES, so we don't resend the whole history
+ * each round. The window is trimmed to start at a `user` message so we never orphan an
+ * assistant-with-tool_calls or a tool result (which the API rejects).
+ */
+function windowMessages(messages: LlmMessage[]): LlmMessage[] {
+  if (messages.length <= MAX_SENT_MESSAGES + 1) return messages;
+  const hasSystem = messages[0]?.role === 'system';
+  const system = hasSystem ? [messages[0]] : [];
+  const rest = messages.slice(hasSystem ? 1 : 0).slice(-MAX_SENT_MESSAGES);
+  while (rest.length && rest[0].role !== 'user') rest.shift();
+  return [...system, ...rest];
 }

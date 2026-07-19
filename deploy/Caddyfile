@@ -1,0 +1,7 @@
+# TLS termination + reverse proxy. Caddy auto-provisions Let's Encrypt certs when SITE_ADDRESS is a
+# real domain pointed at this host. WebSocket upgrades (socket.io) are proxied automatically — no
+# extra config needed (this is the main reason to use Caddy over a hand-configured nginx).
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
