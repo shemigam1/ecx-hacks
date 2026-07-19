@@ -46,24 +46,53 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
-  deploy:
-    name: Deploy to OCI
+  image:
+    name: Build & push image to GHCR
     needs: [backend, frontend]
-    # Only deploy on a push to main (not on PRs), and only after CI passes.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lowercase owner for GHCR
+        id: meta
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push the full-stack image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/steward:latest
+            ghcr.io/${{ steps.meta.outputs.owner }}/steward:${{ github.sha }}
+          # VITE_API_KEY is baked into the frontend bundle — set repo variable VITE_API_KEY = INTERNAL_API_KEY.
+          build-args: |
+            VITE_API_KEY=${{ vars.VITE_API_KEY || 'dev-steward-key' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Trigger Dokploy deploy
+    needs: [image]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy over SSH (pull latest + rebuild the stack on the VM)
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.OCI_HOST }}
-          username: ${{ secrets.OCI_USER }}
-          key: ${{ secrets.OCI_SSH_KEY }}
-          script: |
-            set -e
-            cd ~/ecx-hacks
-            git fetch --all
-            git reset --hard origin/main   # mirror main; untracked .env files are preserved
-            cd deploy
-            docker compose up -d --build
-            docker image prune -f
+      - name: Trigger Dokploy redeploy (it re-pulls :latest)
+        env:
+          HOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
+        run: |
+          if [ -n "$HOOK" ]; then
+            curl -fsSL --retry 3 -X POST "$HOOK"
+          else
+            echo "DOKPLOY_DEPLOY_WEBHOOK not set yet — skipping (deploy manually in Dokploy the first time)."
+          fi

@@ -27,4 +27,7 @@ COPY --from=frontend /fe/dist ./frontend-dist
 ENV FRONTEND_DIST=/app/frontend-dist
 
 EXPOSE 3000
-CMD ["sh", "-c", "pnpm prisma migrate deploy && (pnpm exec ts-node prisma/seed.ts || echo 'seed skipped') && node \"$(find dist -name main.js | head -1)\""]
+# migrate → (optionally) seed → start. The seed is DESTRUCTIVE (wipes + reseeds demo data), and Dokploy
+# redeploys on every push — so it's gated on SEED_ON_DEPLOY. Leave it unset/true for the first deploy,
+# then set SEED_ON_DEPLOY=false in Dokploy so later deploys keep your data.
+CMD ["sh", "-c", "pnpm prisma migrate deploy && { [ \"$SEED_ON_DEPLOY\" = false ] && echo 'seed disabled' || pnpm exec ts-node prisma/seed.ts || echo 'seed skipped'; } && node \"$(find dist -name main.js | head -1)\""]
