@@ -70,10 +70,23 @@ export interface AuthPrincipal {
     userId: string;
     accountId: string;
     role: string;
+    /** Display name for a personal greeting (added to the JWT server-side; '' on older tokens). */
+    name?: string;
 }
 
-export interface OtpRequestResult { sent: true; devCode?: string }
-export interface OtpVerifyResult { token: string; principal: AuthPrincipal }
+export interface AuthResult { token: string; principal: AuthPrincipal }
+export interface LoginInput { phone: string; passcode: string }
+
+export interface RegisterInput {
+    name: string;
+    phone: string;
+    passcode: string;
+    monthlyCapKobo: Kobo;
+    cosignThresholdKobo: Kobo;
+    perTxCapKobo?: Kobo;
+    trustedContactName?: string;
+    trustedContactPhone?: string;
+}
 
 /** Row shape from CosignService.listPending() */
 export interface CosignPendingRow {

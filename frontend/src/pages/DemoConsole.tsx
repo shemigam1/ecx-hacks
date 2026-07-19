@@ -66,7 +66,7 @@ export function DemoConsole() {
                 <button
                     type="button"
                     onClick={() => setEvents([])}
-                    className="rounded-lg border border-gray-300 px-4 py-1.5 font-medium hover:bg-gray-50"
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-1.5 font-medium hover:bg-gray-50"
                 >
                     Clear stream
                 </button>
@@ -78,12 +78,12 @@ export function DemoConsole() {
 
             <ol aria-live="polite" aria-label="Live payment events, newest first" className="flex flex-col gap-4">
                 {events.length === 0 && (
-                    <li className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-600">
+                    <li className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-600">
                         Waiting for events… fire a scene from the Simulator to light this up.
                     </li>
                 )}
                 {events.map((e) => (
-                    <li key={e.key} className={`rounded-xl border border-gray-200 border-l-4 p-4 ${accentFor(e)}`}>
+                    <li key={e.key} className={`rounded-xl border border-gray-200 bg-white shadow-sm border-l-4 p-4 ${accentFor(e)}`}>
                         <div className="flex items-start justify-between gap-3">
                             <p className="text-sm text-gray-500">
                                 {e.at}
@@ -95,7 +95,7 @@ export function DemoConsole() {
                             </p>
                             {e.kind === 'decision' && <StatusChip status={e.p.status} />}
                             {e.kind === 'escalated' && (
-                                <Link to="/cosign" className="font-bold text-blue-700 underline">Review on Cosign</Link>
+                                <Link to="/approvals" className="font-bold text-brand-700 underline">Review in Approvals</Link>
                             )}
                         </div>
 

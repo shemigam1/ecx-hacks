@@ -10,7 +10,8 @@ const badge: Record<Verdict, string> = {
 export function VerdictBadge({ verdict }: { verdict: string }) {
     const v = (['ALLOW', 'ESCALATE', 'DENY'].includes(verdict) ? verdict : 'DENY') as Verdict;
     return (
-        <span className={`inline-block rounded-full border px-3 py-0.5 text-sm font-bold ${badge[v]}`}>
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-sm font-bold ${badge[v]}`}>
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
             {v}
         </span>
     );

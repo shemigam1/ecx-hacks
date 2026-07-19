@@ -4,26 +4,28 @@ import type { AuthPrincipal } from './auth.service';
 import { Public } from './public.decorator';
 import { JwtAuthGuard } from './jwt.guard';
 import { CurrentPrincipal } from './principal.decorator';
-import { OtpRequestDto, OtpVerifyDto } from './dto/otp.dto';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 
 /**
- * Web login (owner / trusted contact): phone OTP → JWT. `otp/*` are @Public (the login path).
- * `me` demonstrates the JwtAuthGuard. (Voice PIN auth lives in the VoiceController via AuthService.)
+ * Web login (owner / trusted contact): phone + numeric passcode → JWT. `login`/`register` are @Public
+ * (the entry paths). `me` demonstrates the JwtAuthGuard. (The same passcode is the voice DTMF PIN,
+ * verified in the VoiceController via AuthService.)
  */
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
-  @Post('otp/request')
-  requestOtp(@Body() body: OtpRequestDto) {
-    return this.auth.requestOtp(body.phone);
+  @Post('login')
+  login(@Body() body: LoginDto) {
+    return this.auth.loginWithPasscode(body.phone, body.passcode);
   }
 
   @Public()
-  @Post('otp/verify')
-  verifyOtp(@Body() body: OtpVerifyDto) {
-    return this.auth.verifyOtp(body.phone, body.code);
+  @Post('register')
+  register(@Body() body: RegisterDto) {
+    return this.auth.register(body);
   }
 
   @UseGuards(JwtAuthGuard)

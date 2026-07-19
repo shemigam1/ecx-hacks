@@ -41,25 +41,28 @@ export function Policy() {
 
     return (
         <section aria-labelledby="policy-heading">
-            <h1 id="policy-heading" className="mb-2 text-3xl font-bold">Rules</h1>
-            <p className="mb-6">What each helper (human or AI) is allowed to do with your money.</p>
+            <h1 id="policy-heading" className="mb-2 text-3xl font-bold">Your rules</h1>
+            <p className="mb-6 max-w-2xl text-gray-700">
+                Every helper — a person or the AI agent — acts under a set of rules you control. Look one up
+                to see exactly what it may do with your money, and revoke its access the moment you want to.
+            </p>
 
             <div className="mb-6 flex flex-wrap items-end gap-3">
                 <div className="flex flex-col">
-                    <label htmlFor="cred" className="font-medium">Credential ID</label>
+                    <label htmlFor="cred" className="font-medium">Helper reference</label>
                     <input
                         id="cred"
                         value={credentialId}
                         onChange={(e) => setCredentialId(e.target.value)}
-                        className="rounded border border-gray-400 p-3 dark:border-zinc-600 dark:bg-zinc-800"
-                        placeholder="from the seed / dashboard"
+                        className="rounded-lg border border-gray-300 bg-white p-3"
+                        placeholder="paste the helper’s reference ID"
                     />
                 </div>
                 <button
                     type="button"
                     onClick={() => setLoadedId(credentialId.trim())}
                     disabled={!credentialId.trim()}
-                    className="rounded bg-purple-900 px-5 py-3 font-bold text-white disabled:opacity-50"
+                    className="rounded bg-brand-600 px-5 py-3 font-bold text-white disabled:opacity-50"
                 >
                     Load rules
                 </button>
@@ -78,7 +81,7 @@ export function Policy() {
             )}
 
             {policy.data && (
-                <div className="rounded-lg border border-gray-300 p-4 dark:border-zinc-700">
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                     <h2 className="text-xl font-bold">
                         {policy.data.label ?? policy.data.credentialId}
                         {policy.data.status === 'REVOKED' && (

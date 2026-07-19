@@ -26,13 +26,19 @@ export function Cosign() {
     });
 
     const invalidate = () => qc.invalidateQueries({ queryKey: ['cosign', 'pending'] });
+    // cosign.resolved fires BEFORE the orchestrator finishes resuming/voiding the intent (it's the
+    // trigger, not the outcome) — an immediate refetch races the DB update and the row lingers. So we
+    // refetch on the FINAL events (intent.executed / intent.voided), with a delayed fallback.
+    const invalidateSoon = () => setTimeout(invalidate, 1200);
     useSocketEvent<IntentEscalatedPayload>('intent.escalated', invalidate);
-    useSocketEvent<CosignResolvedPayload>('cosign.resolved', invalidate);
+    useSocketEvent<CosignResolvedPayload>('cosign.resolved', invalidateSoon);
+    useSocketEvent('intent.executed', invalidate);
+    useSocketEvent('intent.voided', invalidate);
 
     const resolve = useMutation({
         mutationFn: ({ intentId, approve }: { intentId: string; approve: boolean }) =>
             api.post(`/cosign/${intentId}/resolve`, { approve, byUserId: principal?.userId ?? 'unknown' }),
-        onSettled: invalidate,
+        onSettled: invalidateSoon,
     });
 
     return (
@@ -57,12 +63,12 @@ export function Cosign() {
 
             <ul aria-live="polite" aria-label="Pending approvals" className="flex flex-col gap-4">
                 {pending.data?.length === 0 && (
-                    <li className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-600">
+                    <li className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-600">
                         Nothing waiting. New requests appear here instantly.
                     </li>
                 )}
                 {pending.data?.map((row) => (
-                    <li key={row.intentId} className="rounded-xl border border-gray-200 border-l-4 border-l-orange-500 p-4">
+                    <li key={row.intentId} className="rounded-xl border border-gray-200 bg-white shadow-sm border-l-4 border-l-orange-500 p-4">
                         <p className="text-sm text-gray-500">
                             Requested {new Date(row.createdAt).toLocaleTimeString('en-NG', { hour12: false })} · intent{' '}
                             <span className="font-mono">{row.intentId}</span>
